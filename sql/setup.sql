@@ -45,6 +45,7 @@ CREATE TABLE videos (
     tags TEXT[],
     default_language TEXT,
     has_ai_keywords BOOLEAN DEFAULT FALSE,
+    thumbnail_url TEXT,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -366,6 +367,7 @@ SELECT DISTINCT ON (v.id)
     v.duration_seconds,
     v.topic_ids,
     v.has_ai_keywords,
+    v.thumbnail_url,
     vs.view_count,
     vs.like_count,
     vs.comment_count,

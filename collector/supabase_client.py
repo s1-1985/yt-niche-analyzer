@@ -70,6 +70,7 @@ def upsert_videos(client: Client, videos: list[dict]) -> int:
             "tags": v["tags"],
             "default_language": v["default_language"],
             "has_ai_keywords": v["has_ai_keywords"],
+            "thumbnail_url": v.get("thumbnail_url"),
         }
         for v in videos
     ]

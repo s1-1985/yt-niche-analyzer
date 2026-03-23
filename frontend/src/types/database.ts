@@ -60,6 +60,7 @@ export interface VideoRanking {
   duration_seconds: number;
   topic_ids: string[];
   has_ai_keywords: boolean;
+  thumbnail_url: string | null;
   view_count: number;
   like_count: number;
   comment_count: number;
