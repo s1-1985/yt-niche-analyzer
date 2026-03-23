@@ -66,7 +66,7 @@ def main():
         try:
             # 1. search.list で動画IDを取得（再生数順 + 新着順）
             topic_info = TOPIC_IDS.get(topic_id, {})
-            query = topic_info.get("name")
+            query = topic_info.get("name_ja") or topic_info.get("name")
             video_ids_popular = yt.search_videos_by_topic(topic_id, order="viewCount", query=query)
             video_ids_recent = yt.search_videos_by_topic(topic_id, order="date", query=query)
         except QuotaExceededError:

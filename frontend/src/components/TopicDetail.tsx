@@ -14,6 +14,10 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function thumbUrl(video: { id: string; thumbnail_url: string | null }): string {
+  return video.thumbnail_url || `https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`;
+}
+
 function timeAgo(dateStr: string): string {
   const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
   if (days === 0) return '今日';
@@ -137,9 +141,7 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
                     className="video-card buzz-card"
                   >
                     <div className="video-rank buzz-rank">#{i + 1}</div>
-                    {v.thumbnail_url && (
-                      <img className="video-thumb" src={v.thumbnail_url} alt="" loading="lazy" />
-                    )}
+                    <img className="video-thumb" src={thumbUrl(v)} alt="" loading="lazy" />
                     <div className="video-info">
                       <div className="video-title">{v.title}</div>
                       <div className="video-meta">
@@ -185,9 +187,7 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
                     <tr key={v.id}>
                       <td>{i + 1}</td>
                       <td>
-                        {v.thumbnail_url && (
-                          <img className="table-thumb" src={v.thumbnail_url} alt="" loading="lazy" />
-                        )}
+                        <img className="table-thumb" src={thumbUrl(v)} alt="" loading="lazy" />
                       </td>
                       <td>
                         <a
