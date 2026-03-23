@@ -38,6 +38,7 @@ class YouTubeClient:
                 type="video",
                 order=order,
                 regionCode="JP",
+                relevanceLanguage="ja",
                 maxResults=max_results,
                 publishedAfter=published_after,
             )
