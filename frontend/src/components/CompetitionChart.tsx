@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { CompetitionConcentration } from '../types/database';
 
 interface Props {
@@ -35,7 +36,10 @@ export function CompetitionChart({ data, onTopicClick }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>競合集中度（Top5 シェア %）</h3>
+      <div className="chart-title-row">
+        <h3>競合集中度（Top5 シェア %）</h3>
+        <HelpButton {...HELP_TEXTS.competition} />
+      </div>
       <p className="chart-desc">上位5チャンネルが占める再生数の割合。高いほど寡占（クリックで詳細）</p>
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>

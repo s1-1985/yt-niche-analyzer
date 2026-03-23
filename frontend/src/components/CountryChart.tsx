@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicCountryDistribution } from '../types/database';
 
 interface Props {
@@ -63,7 +64,10 @@ export function CountryChart({ data }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>国別チャンネル分布</h3>
+      <div className="chart-title-row">
+        <h3>国別チャンネル分布</h3>
+        <HelpButton {...HELP_TEXTS.country} />
+      </div>
       <p className="chart-desc">
         チャンネルの所在国。日本の割合が少ないジャンル = 日本語コンテンツの穴がある可能性
       </p>

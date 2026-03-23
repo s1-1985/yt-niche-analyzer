@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicOverlap } from '../types/database';
-import type { TimePeriod } from '../hooks/useFilteredQuery';
+import type { TimePeriod, VideoType } from '../hooks/useFilteredQuery';
 
 interface Props {
   period: TimePeriod;
+  videoType?: VideoType;
   onOverlapLoaded?: (data: TopicOverlap[]) => void;
   onTopicClick?: (topicId: string) => void;
 }
@@ -21,7 +23,7 @@ function getMinDate(period: TimePeriod): string | null {
   return now.toISOString();
 }
 
-export function TopicOverlapChart({ period, onOverlapLoaded, onTopicClick }: Props) {
+export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, onTopicClick }: Props) {
   const [data, setData] = useState<TopicOverlap[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,62 +31,50 @@ export function TopicOverlapChart({ period, onOverlapLoaded, onTopicClick }: Pro
     setLoading(true);
     const fetchData = async () => {
       let result;
-      if (period === 'all') {
-        result = await supabase
-          .from('topic_overlap')
-          .select('*')
-          .order('shared_channels', { ascending: false })
-          .limit(30);
+      if (period === 'all' && videoType === 'all') {
+        result = await supabase.from('topic_overlap').select('*')
+          .order('shared_channels', { ascending: false }).limit(30);
       } else {
         const minDate = getMinDate(period);
-        result = await supabase.rpc('fn_topic_overlap', { p_min_date: minDate });
+        result = await supabase.rpc('fn_topic_overlap', {
+          p_min_date: minDate, p_video_type: videoType,
+        });
       }
       const d = ((result.data as TopicOverlap[]) ?? [])
-        .sort((a, b) => b.shared_channels - a.shared_channels)
-        .slice(0, 30);
+        .sort((a, b) => b.shared_channels - a.shared_channels).slice(0, 30);
       setData(d);
       onOverlapLoaded?.(d);
       setLoading(false);
     };
     fetchData();
-  }, [period]);
+  }, [period, videoType]);
 
   if (loading) return null;
   if (data.length === 0) return null;
 
-  const maxShared = data[0]?.shared_channels ?? 1;
-
   return (
     <div className="chart-card">
-      <h3>ジャンル相関マップ</h3>
+      <div className="chart-title-row">
+        <h3>ジャンル相関マップ</h3>
+        <HelpButton {...HELP_TEXTS.topicOverlap} />
+      </div>
       <p className="chart-desc">
-        チャンネルが重複しているジャンルの組み合わせ。隣接ニッチを見つけてクロス展開戦略に活用
+        チャンネルが重複しているジャンルの組み合わせ。タップで対象ジャンルの詳細へ
       </p>
-      <div className="overlap-list">
+      <div className="overlap-list-simple">
         {data.map((row, i) => (
-          <div key={i} className="overlap-item">
-            <div className="overlap-pair">
-              <button
-                className="overlap-topic"
-                onClick={() => onTopicClick?.(row.topic_a)}
-              >
+          <div key={i} className="overlap-row">
+            <span className="overlap-rank">#{i + 1}</span>
+            <div className="overlap-names">
+              <button className="overlap-topic" onClick={() => onTopicClick?.(row.topic_a)}>
                 {row.name_a}
               </button>
-              <span className="overlap-connector">x</span>
-              <button
-                className="overlap-topic"
-                onClick={() => onTopicClick?.(row.topic_b)}
-              >
+              <span className="overlap-x">×</span>
+              <button className="overlap-topic" onClick={() => onTopicClick?.(row.topic_b)}>
                 {row.name_b}
               </button>
             </div>
-            <div className="overlap-bar-wrap">
-              <div
-                className="overlap-bar"
-                style={{ width: `${(row.shared_channels / maxShared) * 100}%` }}
-              />
-            </div>
-            <span className="overlap-count">{row.shared_channels}ch</span>
+            <span className="overlap-ch">{row.shared_channels}ch</span>
           </div>
         ))}
       </div>

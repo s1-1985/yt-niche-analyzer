@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ZAxis,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
+import { RankingList, type RankingItem } from './RankingList';
 import type { NewChannelSuccessRate } from '../types/database';
 
 interface Props {
@@ -20,6 +23,8 @@ interface ChartEntry {
 
 export function SuccessRateChart({ data, onTopicClick }: Props) {
   const isMobile = useIsMobile();
+  const [showList, setShowList] = useState(false);
+
   const chartData: ChartEntry[] = data
     .filter((d) => d.new_channel_count > 0)
     .map((d) => ({
@@ -30,49 +35,66 @@ export function SuccessRateChart({ data, onTopicClick }: Props) {
       topic_id: d.topic_id,
     }));
 
+  const rankingItems: RankingItem[] = [...chartData]
+    .sort((a, b) => b.success_rate - a.success_rate)
+    .map((d) => ({
+      name: d.name,
+      value: d.success_rate,
+      sub: `${d.successful}/${d.new_channels}ch成功`,
+      topic_id: d.topic_id,
+    }));
+
   return (
     <div className="chart-card">
-      <h3>新規チャンネル成功率</h3>
-      <p className="chart-desc">過去1年に開設されたチャンネルのうち登録者1,000人超の割合（クリックで詳細）</p>
-      <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
-        <ScatterChart margin={isMobile
-          ? { left: 5, bottom: 5, right: 10, top: 5 }
-          : { left: 20, bottom: 20 }
-        }>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" dataKey="new_channels" name="新規チャンネル数" tick={{ fontSize: isMobile ? 9 : 12 }} />
-          <YAxis
-            type="number"
-            dataKey="success_rate"
-            name="成功率"
-            unit="%"
-            tick={{ fontSize: isMobile ? 9 : 12 }}
-            width={isMobile ? 35 : 60}
-          />
-          <ZAxis type="number" dataKey="successful" range={isMobile ? [30, 200] : [40, 400]} name="成功数" />
-          <Tooltip
-            content={({ payload }) => {
-              if (!payload?.length) return null;
-              const d = payload[0].payload as ChartEntry;
-              return (
-                <div className="custom-tooltip">
-                  <strong>{d.name}</strong>
-                  <div>新規: {d.new_channels}ch</div>
-                  <div>成功率: {d.success_rate}%</div>
-                  <div>成功数: {d.successful}ch</div>
-                  <div className="tooltip-hint">クリックで詳細</div>
-                </div>
-              );
-            }}
-          />
-          <Scatter
-            data={chartData}
-            fill="#10b981"
-            cursor="pointer"
-            onClick={(entry: unknown) => onTopicClick?.((entry as ChartEntry).topic_id)}
-          />
-        </ScatterChart>
-      </ResponsiveContainer>
+      <div className="chart-title-row">
+        <h3>新規チャンネル成功率</h3>
+        <HelpButton {...HELP_TEXTS.successRate} />
+      </div>
+      <p className="chart-desc">過去1年に開設されたチャンネルのうち登録者1,000人超の割合</p>
+      <button className="view-toggle-btn" onClick={() => setShowList(!showList)}>
+        {showList ? 'チャートに戻す' : 'ランキングで見る'}
+      </button>
+
+      {showList ? (
+        <RankingList items={rankingItems} valueLabel="成功率"
+          valueFormatter={(v) => `${v}%`} onItemClick={onTopicClick} />
+      ) : (
+        <>
+          <div className="chart-axis-labels">
+            <span>X: 新規チャンネル数</span>
+            <span>Y: 成功率(%)</span>
+          </div>
+          <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
+            <ScatterChart margin={isMobile
+              ? { left: 5, bottom: 5, right: 10, top: 5 }
+              : { left: 20, bottom: 20 }
+            }>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" dataKey="new_channels" name="新規ch数" tick={{ fontSize: isMobile ? 9 : 12 }} />
+              <YAxis type="number" dataKey="success_rate" name="成功率" unit="%"
+                tick={{ fontSize: isMobile ? 9 : 12 }} width={isMobile ? 35 : 60} />
+              <ZAxis type="number" dataKey="successful" range={isMobile ? [30, 200] : [40, 400]} name="成功数" />
+              <Tooltip
+                content={({ payload }) => {
+                  if (!payload?.length) return null;
+                  const d = payload[0].payload as ChartEntry;
+                  return (
+                    <div className="custom-tooltip">
+                      <strong>{d.name}</strong>
+                      <div>新規: {d.new_channels}ch</div>
+                      <div>成功率: {d.success_rate}%</div>
+                      <div>成功数: {d.successful}ch</div>
+                      <div className="tooltip-hint">クリックで詳細</div>
+                    </div>
+                  );
+                }}
+              />
+              <Scatter data={chartData} fill="#10b981" cursor="pointer"
+                onClick={(entry: unknown) => onTopicClick?.((entry as ChartEntry).topic_id)} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </>
+      )}
     </div>
   );
 }
