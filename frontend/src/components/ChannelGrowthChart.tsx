@@ -3,6 +3,7 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ZAxis, Label,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { supabase } from '../lib/supabase';
 import type { ChannelGrowthEfficiency } from '../types/database';
 import type { TimePeriod } from '../hooks/useFilteredQuery';
@@ -34,6 +35,7 @@ function getMinDate(period: TimePeriod): string | null {
 }
 
 export function ChannelGrowthChart({ period, onTopicClick }: Props) {
+  const isMobile = useIsMobile();
   const [data, setData] = useState<ChannelGrowthEfficiency[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,22 +78,30 @@ export function ChannelGrowthChart({ period, onTopicClick }: Props) {
       <p className="chart-desc">
         チャンネル年齢（月）vs 登録者数。左上にいるチャンネルは短期間で急成長（クリックで詳細）
       </p>
-      <ResponsiveContainer width="100%" height={400}>
-        <ScatterChart margin={{ left: 20, bottom: 30, right: 20, top: 10 }}>
+      <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
+        <ScatterChart margin={isMobile
+          ? { left: 5, bottom: 5, right: 10, top: 5 }
+          : { left: 20, bottom: 30, right: 20, top: 10 }
+        }>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" dataKey="age_months" name="チャンネル年齢" tick={{ fontSize: 11 }}>
-            <Label value="チャンネル年齢（月）" position="bottom" offset={10} style={{ fill: '#9ca3af', fontSize: 12 }} />
+          <XAxis type="number" dataKey="age_months" name="チャンネル年齢" tick={{ fontSize: isMobile ? 9 : 11 }}>
+            {!isMobile && (
+              <Label value="チャンネル年齢（月）" position="bottom" offset={10} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            )}
           </XAxis>
           <YAxis
             type="number"
             dataKey="subscriber_count"
             name="登録者数"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: isMobile ? 9 : 11 }}
             tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v}
+            width={isMobile ? 40 : 60}
           >
-            <Label value="登録者数" angle={-90} position="insideLeft" offset={-5} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            {!isMobile && (
+              <Label value="登録者数" angle={-90} position="insideLeft" offset={-5} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            )}
           </YAxis>
-          <ZAxis type="number" dataKey="views_per_video" range={[30, 300]} name="動画あたり再生" />
+          <ZAxis type="number" dataKey="views_per_video" range={isMobile ? [20, 150] : [30, 300]} name="動画あたり再生" />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;

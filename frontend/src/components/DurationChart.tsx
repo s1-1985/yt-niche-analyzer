@@ -1,6 +1,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicDurationStats } from '../types/database';
 
 interface Props {
@@ -23,12 +24,18 @@ function toMin(sec: number): number {
   return Math.round(sec / 60 * 10) / 10;
 }
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
 export function DurationChart({ data, onTopicClick }: Props) {
+  const isMobile = useIsMobile();
   const subTopics = data.filter((d) => d.parent_id !== null);
+  const itemCount = isMobile ? 10 : 25;
 
   const sorted = [...subTopics]
     .sort((a, b) => a.median_duration - b.median_duration)
-    .slice(0, 25);
+    .slice(0, itemCount);
 
   const chartData: ChartEntry[] = sorted.map((d) => ({
     name: d.name_ja ?? d.topic_name,
@@ -41,17 +48,25 @@ export function DurationChart({ data, onTopicClick }: Props) {
     topic_id: d.topic_id,
   }));
 
+  const chartHeight = isMobile ? itemCount * 36 + 40 : 500;
+
   return (
     <div className="chart-card">
       <h3>動画尺の最適ゾーン</h3>
       <p className="chart-desc">
         ジャンル別の中央値動画長（分）。何分の動画を作ればそのジャンルの「普通」に合うかがわかる（クリックで詳細）
       </p>
-      <ResponsiveContainer width="100%" height={500}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" unit="分" tick={{ fontSize: 11 }} />
-          <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12 }} />
+          <XAxis type="number" unit="分" tick={{ fontSize: isMobile ? 10 : 11 }} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={isMobile ? 60 : 90}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+            tickFormatter={(v) => truncate(v, isMobile ? 6 : 20)}
+          />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;
@@ -71,7 +86,7 @@ export function DurationChart({ data, onTopicClick }: Props) {
               );
             }}
           />
-          <Legend />
+          {!isMobile && <Legend />}
           <Bar
             dataKey="median_min"
             fill="#06b6d4"

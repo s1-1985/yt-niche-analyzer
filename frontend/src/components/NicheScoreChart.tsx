@@ -1,6 +1,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration } from '../types/database';
 
 interface Props {
@@ -26,7 +27,12 @@ function normalize(value: number, min: number, max: number): number {
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
 }
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
 export function NicheScoreChart({ topics, competition, successRate, aiPenetration, onTopicClick }: Props) {
+  const isMobile = useIsMobile();
   const subTopics = topics.filter((t) => t.parent_id !== null);
 
   const compMap = new Map(competition.map((c) => [c.topic_id, c.top5_share_pct]));
@@ -68,7 +74,8 @@ export function NicheScoreChart({ topics, competition, successRate, aiPenetratio
     };
   });
 
-  const chartData = [...scored].sort((a, b) => b.niche_score - a.niche_score).slice(0, 20);
+  const itemCount = isMobile ? 10 : 20;
+  const chartData = [...scored].sort((a, b) => b.niche_score - a.niche_score).slice(0, itemCount);
 
   const getBarColor = (score: number) => {
     if (score >= 70) return '#10b981';
@@ -76,17 +83,26 @@ export function NicheScoreChart({ topics, competition, successRate, aiPenetratio
     return '#ef4444';
   };
 
+  const chartHeight = isMobile ? itemCount * 36 + 40 : 500;
+  const labelLen = isMobile ? 6 : 20;
+
   return (
     <div className="chart-card niche-score-card">
-      <h3>ニッチ推奨スコア TOP 20</h3>
+      <h3>ニッチ推奨スコア TOP {itemCount}</h3>
       <p className="chart-desc">
         需給ギャップ(35%) + 競合の少なさ(25%) + 新規成功率(25%) + AI未開拓度(15%) の総合スコア
       </p>
-      <ResponsiveContainer width="100%" height={500}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" domain={[0, 100]} />
-          <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12 }} />
+          <XAxis type="number" domain={[0, 100]} tick={{ fontSize: isMobile ? 10 : 12 }} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={isMobile ? 60 : 90}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+            tickFormatter={(v) => truncate(v, labelLen)}
+          />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;

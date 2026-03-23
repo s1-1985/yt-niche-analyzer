@@ -2,6 +2,7 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ZAxis, ReferenceArea, ReferenceLine, Label, Cell,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicSummary, CompetitionConcentration } from '../types/database';
 
 interface Props {
@@ -30,6 +31,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export function EntryMatrixChart({ topics, competition, onTopicClick }: Props) {
+  const isMobile = useIsMobile();
   const compMap = new Map(competition.map((c) => [c.topic_id, c.top5_share_pct]));
 
   const subTopics = topics.filter((t) => t.parent_id !== null);
@@ -61,16 +63,21 @@ export function EntryMatrixChart({ topics, competition, onTopicClick }: Props) {
       <p className="chart-desc">
         右下が狙い目ゾーン（需要が高く、競合が分散）。左上は避けるべきゾーン（クリックで詳細）
       </p>
-      <ResponsiveContainer width="100%" height={450}>
-        <ScatterChart margin={{ left: 20, bottom: 30, right: 20, top: 10 }}>
+      <ResponsiveContainer width="100%" height={isMobile ? 300 : 450}>
+        <ScatterChart margin={isMobile
+          ? { left: 5, bottom: 5, right: 10, top: 5 }
+          : { left: 20, bottom: 30, right: 20, top: 10 }
+        }>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
             type="number"
             dataKey="gap_score"
             name="需給ギャップ"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: isMobile ? 9 : 11 }}
           >
-            <Label value="需給ギャップ (高い = 需要大)" position="bottom" offset={10} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            {!isMobile && (
+              <Label value="需給ギャップ (高い = 需要大)" position="bottom" offset={10} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            )}
           </XAxis>
           <YAxis
             type="number"
@@ -78,11 +85,14 @@ export function EntryMatrixChart({ topics, competition, onTopicClick }: Props) {
             name="Top5集中度"
             unit="%"
             domain={[0, 100]}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: isMobile ? 9 : 11 }}
+            width={isMobile ? 35 : 60}
           >
-            <Label value="競合集中度 (低い = 参入しやすい)" angle={-90} position="insideLeft" offset={-5} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            {!isMobile && (
+              <Label value="競合集中度 (低い = 参入しやすい)" angle={-90} position="insideLeft" offset={-5} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            )}
           </YAxis>
-          <ZAxis type="number" dataKey="avg_views" range={[60, 400]} name="平均再生" />
+          <ZAxis type="number" dataKey="avg_views" range={isMobile ? [30, 200] : [60, 400]} name="平均再生" />
           {/* Sweet spot zone - bottom right */}
           <ReferenceArea
             x1={gapMedian}
@@ -135,7 +145,7 @@ export function EntryMatrixChart({ topics, competition, onTopicClick }: Props) {
                 key={index}
                 fill={CATEGORY_COLORS[entry.category] ?? '#6366f1'}
                 stroke="#ffffff"
-                strokeWidth={2}
+                strokeWidth={isMobile ? 1 : 2}
               />
             ))}
           </Scatter>

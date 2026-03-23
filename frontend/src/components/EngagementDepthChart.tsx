@@ -1,6 +1,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicSummary } from '../types/database';
 
 interface Props {
@@ -16,7 +17,13 @@ interface ChartEntry {
   topic_id: string;
 }
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
 export function EngagementDepthChart({ data, onTopicClick }: Props) {
+  const isMobile = useIsMobile();
+  const itemCount = isMobile ? 10 : 20;
   const subTopics = data.filter((d) => d.parent_id !== null && d.like_rate_pct > 0);
 
   const chartData: ChartEntry[] = subTopics
@@ -30,7 +37,9 @@ export function EngagementDepthChart({ data, onTopicClick }: Props) {
       topic_id: d.topic_id,
     }))
     .sort((a, b) => b.depth_ratio - a.depth_ratio)
-    .slice(0, 20);
+    .slice(0, itemCount);
+
+  const chartHeight = isMobile ? itemCount * 36 + 40 : 500;
 
   return (
     <div className="chart-card">
@@ -38,11 +47,17 @@ export function EngagementDepthChart({ data, onTopicClick }: Props) {
       <p className="chart-desc">
         コメント率 / いいね率 = 「見て終わり」vs「語りたくなる」。高い = コミュニティ形成しやすい（クリックで詳細）
       </p>
-      <ResponsiveContainer width="100%" height={500}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" tick={{ fontSize: 11 }} />
-          <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12 }} />
+          <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 11 }} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={isMobile ? 60 : 90}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+            tickFormatter={(v) => truncate(v, isMobile ? 6 : 20)}
+          />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;
