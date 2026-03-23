@@ -9,15 +9,18 @@ from topic_ids import TOPIC_IDS
 
 logger = logging.getLogger(__name__)
 
-# 全topicIdを3グループに分割
+# 全topicIdを7グループに分割（1グループ約10トピック、クオータ内に収める）
+NUM_GROUPS = 7
+
 def _build_groups():
     all_ids = list(TOPIC_IDS.keys())
-    group_size = len(all_ids) // 3
-    return [
-        all_ids[:group_size],
-        all_ids[group_size:group_size * 2],
-        all_ids[group_size * 2:],
-    ]
+    group_size = len(all_ids) // NUM_GROUPS
+    groups = []
+    for i in range(NUM_GROUPS):
+        start = i * group_size
+        end = start + group_size if i < NUM_GROUPS - 1 else len(all_ids)
+        groups.append(all_ids[start:end])
+    return groups
 
 TOPIC_GROUPS = _build_groups()
 

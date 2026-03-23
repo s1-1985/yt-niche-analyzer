@@ -11,7 +11,7 @@ import logging
 import os
 import sys
 
-from youtube_client import YouTubeClient
+from youtube_client import YouTubeClient, QuotaExceededError
 from supabase_client import init_client, upsert_channels, upsert_videos, cleanup_old_snapshots
 from rotation import get_today_topics, log_collection
 from metrics import compute_collection_stats
@@ -48,12 +48,15 @@ def main():
     for topic_id in today_topics:
         logger.info(f"--- Processing topic: {topic_id} ---")
 
-        # 1. search.list で動画IDを取得（再生数順 + 新着順）
-        # topicId で結果が返らない場合、トピック名でキーワード検索にフォールバック
-        topic_info = TOPIC_IDS.get(topic_id, {})
-        query = topic_info.get("name")
-        video_ids_popular = yt.search_videos_by_topic(topic_id, order="viewCount", query=query)
-        video_ids_recent = yt.search_videos_by_topic(topic_id, order="date", query=query)
+        try:
+            # 1. search.list で動画IDを取得（再生数順 + 新着順）
+            topic_info = TOPIC_IDS.get(topic_id, {})
+            query = topic_info.get("name")
+            video_ids_popular = yt.search_videos_by_topic(topic_id, order="viewCount", query=query)
+            video_ids_recent = yt.search_videos_by_topic(topic_id, order="date", query=query)
+        except QuotaExceededError:
+            logger.warning("Quota exceeded — stopping collection early")
+            break
 
         # 重複を除いて結合
         all_video_ids = list(dict.fromkeys(video_ids_popular + video_ids_recent))
