@@ -15,6 +15,7 @@ from youtube_client import YouTubeClient
 from supabase_client import init_client, upsert_channels, upsert_videos, cleanup_old_snapshots
 from rotation import get_today_topics, log_collection
 from metrics import compute_collection_stats
+from topic_ids import TOPIC_IDS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,8 +49,11 @@ def main():
         logger.info(f"--- Processing topic: {topic_id} ---")
 
         # 1. search.list で動画IDを取得（再生数順 + 新着順）
-        video_ids_popular = yt.search_videos_by_topic(topic_id, order="viewCount")
-        video_ids_recent = yt.search_videos_by_topic(topic_id, order="date")
+        # topicId で結果が返らない場合、トピック名でキーワード検索にフォールバック
+        topic_info = TOPIC_IDS.get(topic_id, {})
+        query = topic_info.get("name")
+        video_ids_popular = yt.search_videos_by_topic(topic_id, order="viewCount", query=query)
+        video_ids_recent = yt.search_videos_by_topic(topic_id, order="date", query=query)
 
         # 重複を除いて結合
         all_video_ids = list(dict.fromkeys(video_ids_popular + video_ids_recent))

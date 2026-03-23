@@ -17,24 +17,41 @@ class YouTubeClient:
         self.quota_used = 0
 
     def search_videos_by_topic(self, topic_id: str, max_results: int = 50,
-                                order: str = "viewCount") -> list[str]:
-        """topicId指定で動画IDリストを取得（search.list: 100 quota units）"""
+                                order: str = "viewCount",
+                                query: str | None = None) -> list[str]:
+        """キーワード検索で動画IDリストを取得（search.list: 100 quota units）
+
+        topicId パラメータは YouTube API で結果が返らないケースが多いため、
+        query（トピック名）を併用してキーワード検索にフォールバックする。
+        """
         published_after = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
 
         try:
-            response = self.youtube.search().list(
+            params = dict(
                 part="snippet",
-                topicId=topic_id,
                 type="video",
                 order=order,
                 regionCode="JP",
                 maxResults=max_results,
                 publishedAfter=published_after,
-            ).execute()
+            )
+            # まず topicId で試す
+            params["topicId"] = topic_id
+            response = self.youtube.search().list(**params).execute()
             self.quota_used += 100
 
             video_ids = [item["id"]["videoId"] for item in response.get("items", [])]
-            logger.info(f"search.list topicId={topic_id} order={order}: {len(video_ids)} videos")
+
+            # topicId で結果が0件かつ query がある場合、キーワード検索にフォールバック
+            if not video_ids and query:
+                logger.info(f"topicId={topic_id} returned 0 results, falling back to q={query}")
+                params.pop("topicId")
+                params["q"] = query
+                response = self.youtube.search().list(**params).execute()
+                self.quota_used += 100
+                video_ids = [item["id"]["videoId"] for item in response.get("items", [])]
+
+            logger.info(f"search.list topic={topic_id} order={order}: {len(video_ids)} videos")
             return video_ids
 
         except Exception as e:
