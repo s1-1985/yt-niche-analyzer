@@ -87,3 +87,34 @@ export interface CollectionLog {
   channels_collected: number;
   quota_used: number;
 }
+
+export interface TopicDurationStats {
+  topic_id: string;
+  topic_name: string;
+  name_ja: string | null;
+  parent_id: string | null;
+  video_count: number;
+  avg_duration: number;
+  median_duration: number;
+  p25_duration: number;
+  p75_duration: number;
+  short_count: number;
+  medium_count: number;
+  long_count: number;
+}
+
+export interface TopicChannelSize {
+  topic_id: string;
+  topic_name: string;
+  name_ja: string | null;
+  parent_id: string | null;
+  total_channels: number;
+  small_count: number;
+  medium_count: number;
+  large_count: number;
+  mega_count: number;
+  small_pct: number;
+  medium_pct: number;
+  large_pct: number;
+  mega_pct: number;
+}

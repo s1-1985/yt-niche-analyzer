@@ -1,13 +1,18 @@
 import { useState, useCallback } from 'react';
 import { useSupabaseQuery } from './hooks/useSupabaseQuery';
 import { KpiCard } from './components/KpiCard';
+import { NicheScoreChart } from './components/NicheScoreChart';
 import { GapScoreChart } from './components/GapScoreChart';
+import { EntryMatrixChart } from './components/EntryMatrixChart';
 import { CompetitionChart } from './components/CompetitionChart';
 import { SuccessRateChart } from './components/SuccessRateChart';
+import { EngagementMapChart } from './components/EngagementMapChart';
 import { AiPenetrationChart } from './components/AiPenetrationChart';
+import { DurationChart } from './components/DurationChart';
+import { ChannelSizeChart } from './components/ChannelSizeChart';
 import { TopicTable } from './components/TopicTable';
 import { TopicDetail } from './components/TopicDetail';
-import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration } from './types/database';
+import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration, TopicDurationStats, TopicChannelSize } from './types/database';
 import './App.css';
 
 function App() {
@@ -15,6 +20,8 @@ function App() {
   const competition = useSupabaseQuery<CompetitionConcentration>('competition_concentration');
   const successRate = useSupabaseQuery<NewChannelSuccessRate>('new_channel_success_rate');
   const aiPen = useSupabaseQuery<AiPenetration>('ai_penetration');
+  const duration = useSupabaseQuery<TopicDurationStats>('topic_duration_stats');
+  const channelSize = useSupabaseQuery<TopicChannelSize>('topic_channel_size');
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
@@ -32,6 +39,16 @@ function App() {
   const avgLikeRate = subTopics.length > 0
     ? (subTopics.reduce((s, t) => s + t.like_rate_pct, 0) / subTopics.length).toFixed(2)
     : '0';
+
+  // Lowest competition topic
+  const lowestComp = competition.data.length > 0
+    ? [...competition.data].sort((a, b) => a.top5_share_pct - b.top5_share_pct)[0]
+    : null;
+
+  // Highest success rate topic
+  const bestSuccess = successRate.data.filter((s) => s.new_channel_count >= 3).length > 0
+    ? [...successRate.data].filter((s) => s.new_channel_count >= 3).sort((a, b) => b.success_rate_pct - a.success_rate_pct)[0]
+    : null;
 
   const handleTopicClick = useCallback((topicId: string) => {
     setSelectedTopicId(topicId);
@@ -84,14 +101,63 @@ function App() {
               color="#f59e0b"
             />
             <KpiCard title="平均いいね率" value={`${avgLikeRate}%`} color="#ec4899" />
+            <KpiCard
+              title="最低競合集中"
+              value={lowestComp ? (lowestComp.name_ja ?? lowestComp.topic_name) : '-'}
+              sub={lowestComp ? `Top5占有: ${lowestComp.top5_share_pct}%` : undefined}
+              color="#06b6d4"
+            />
+            <KpiCard
+              title="新規成功率TOP"
+              value={bestSuccess ? (bestSuccess.name_ja ?? bestSuccess.topic_name) : '-'}
+              sub={bestSuccess ? `成功率: ${bestSuccess.success_rate_pct}%` : undefined}
+              color="#10b981"
+            />
           </section>
 
+          {/* Primary recommendation */}
+          <section className="charts-full">
+            <NicheScoreChart
+              topics={topics.data}
+              competition={competition.data}
+              successRate={successRate.data}
+              aiPenetration={aiPen.data}
+              onTopicClick={handleTopicClick}
+            />
+          </section>
+
+          {/* Strategy matrix */}
+          <section className="charts">
+            <EntryMatrixChart
+              topics={topics.data}
+              competition={competition.data}
+              onTopicClick={handleTopicClick}
+            />
+            <EngagementMapChart data={topics.data} onTopicClick={handleTopicClick} />
+          </section>
+
+          {/* Detailed analysis */}
           <section className="charts">
             <GapScoreChart data={topics.data} onTopicClick={handleTopicClick} />
             <CompetitionChart data={competition.data} onTopicClick={handleTopicClick} />
+          </section>
+
+          <section className="charts">
             <SuccessRateChart data={successRate.data} onTopicClick={handleTopicClick} />
             <AiPenetrationChart data={aiPen.data} onTopicClick={handleTopicClick} />
           </section>
+
+          {/* Content strategy */}
+          {(duration.data.length > 0 || channelSize.data.length > 0) && (
+            <section className="charts">
+              {duration.data.length > 0 && (
+                <DurationChart data={duration.data} onTopicClick={handleTopicClick} />
+              )}
+              {channelSize.data.length > 0 && (
+                <ChannelSizeChart data={channelSize.data} onTopicClick={handleTopicClick} />
+              )}
+            </section>
+          )}
 
           <section className="table-section">
             <TopicTable data={topics.data} onTopicClick={handleTopicClick} />
