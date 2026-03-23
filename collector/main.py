@@ -69,9 +69,9 @@ def main():
         channel_ids = list({v["channel_id"] for v in videos if v.get("channel_id")})
         channels = yt.get_channel_details(channel_ids)
 
-        # 4. Supabase に書き込み
-        n_videos = upsert_videos(sb, videos)
+        # 4. Supabase に書き込み（チャンネルを先に入れて外部キー制約を満たす）
         n_channels = upsert_channels(sb, channels)
+        n_videos = upsert_videos(sb, videos)
 
         total_videos += n_videos
         total_channels += n_channels
