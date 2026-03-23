@@ -2,6 +2,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Legend, Tooltip,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration } from '../types/database';
 
 interface Props {
@@ -32,6 +33,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export function CategoryRadarChart({ topics, competition, successRate, aiPenetration }: Props) {
+  const isMobile = useIsMobile();
   const subTopics = topics.filter((t) => t.parent_id !== null);
 
   // Build maps
@@ -77,12 +79,12 @@ export function CategoryRadarChart({ topics, competition, successRate, aiPenetra
 
   const metrics = ['gap', 'engagement', 'competition', 'success', 'ai', 'volume'] as const;
   const metricLabels: Record<string, string> = {
-    gap: '需給ギャップ',
-    engagement: 'エンゲージメント',
-    competition: '参入しやすさ',
-    success: '新規成功率',
-    ai: 'AI未開拓度',
-    volume: '平均再生数',
+    gap: isMobile ? 'ギャップ' : '需給ギャップ',
+    engagement: isMobile ? 'エンゲジ' : 'エンゲージメント',
+    competition: isMobile ? '参入性' : '参入しやすさ',
+    success: isMobile ? '成功率' : '新規成功率',
+    ai: isMobile ? 'AI未開拓' : 'AI未開拓度',
+    volume: isMobile ? '再生数' : '平均再生数',
   };
 
   // Normalize each metric
@@ -105,10 +107,13 @@ export function CategoryRadarChart({ topics, competition, successRate, aiPenetra
       <p className="chart-desc">
         大カテゴリ間の6軸比較。バランスの良いカテゴリが参入しやすい
       </p>
-      <ResponsiveContainer width="100%" height={450}>
-        <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+      <ResponsiveContainer width="100%" height={isMobile ? 320 : 450}>
+        <RadarChart data={radarData} margin={isMobile
+          ? { top: 10, right: 20, bottom: 10, left: 20 }
+          : { top: 20, right: 30, bottom: 20, left: 30 }
+        }>
           <PolarGrid stroke="#2a2d3e" />
-          <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+          <PolarAngleAxis dataKey="metric" tick={{ fontSize: isMobile ? 9 : 11, fill: '#9ca3af' }} />
           <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
           <Tooltip />
           {catData.map((cat) => (
@@ -122,7 +127,7 @@ export function CategoryRadarChart({ topics, competition, successRate, aiPenetra
               strokeWidth={2}
             />
           ))}
-          <Legend />
+          <Legend wrapperStyle={isMobile ? { fontSize: '0.65rem' } : undefined} />
         </RadarChart>
       </ResponsiveContainer>
     </div>

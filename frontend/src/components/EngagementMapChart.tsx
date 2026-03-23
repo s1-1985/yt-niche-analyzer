@@ -2,6 +2,7 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ZAxis, Label,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicSummary } from '../types/database';
 
 interface Props {
@@ -18,6 +19,7 @@ interface ChartEntry {
 }
 
 export function EngagementMapChart({ data, onTopicClick }: Props) {
+  const isMobile = useIsMobile();
   const chartData: ChartEntry[] = data
     .filter((d) => d.parent_id !== null && d.like_rate_pct > 0)
     .map((d) => ({
@@ -34,16 +36,30 @@ export function EngagementMapChart({ data, onTopicClick }: Props) {
       <p className="chart-desc">
         右上が高エンゲージメント。コメント率が高い = コミュニティが活発 = 新参者が伸びやすい（クリックで詳細）
       </p>
-      <ResponsiveContainer width="100%" height={400}>
-        <ScatterChart margin={{ left: 20, bottom: 30, right: 20, top: 10 }}>
+      <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
+        <ScatterChart margin={isMobile
+          ? { left: 5, bottom: 5, right: 10, top: 5 }
+          : { left: 20, bottom: 30, right: 20, top: 10 }
+        }>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" dataKey="like_rate" name="いいね率" unit="%" tick={{ fontSize: 11 }}>
-            <Label value="いいね率 (%)" position="bottom" offset={10} style={{ fill: '#9ca3af', fontSize: 12 }} />
+          <XAxis type="number" dataKey="like_rate" name="いいね率" unit="%" tick={{ fontSize: isMobile ? 9 : 11 }}>
+            {!isMobile && (
+              <Label value="いいね率 (%)" position="bottom" offset={10} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            )}
           </XAxis>
-          <YAxis type="number" dataKey="comment_rate" name="コメント率" unit="%" tick={{ fontSize: 11 }}>
-            <Label value="コメント率 (%)" angle={-90} position="insideLeft" offset={-5} style={{ fill: '#9ca3af', fontSize: 12 }} />
+          <YAxis
+            type="number"
+            dataKey="comment_rate"
+            name="コメント率"
+            unit="%"
+            tick={{ fontSize: isMobile ? 9 : 11 }}
+            width={isMobile ? 35 : 60}
+          >
+            {!isMobile && (
+              <Label value="コメント率 (%)" angle={-90} position="insideLeft" offset={-5} style={{ fill: '#9ca3af', fontSize: 12 }} />
+            )}
           </YAxis>
-          <ZAxis type="number" dataKey="total_videos" range={[50, 400]} name="動画数" />
+          <ZAxis type="number" dataKey="total_videos" range={isMobile ? [30, 200] : [50, 400]} name="動画数" />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;

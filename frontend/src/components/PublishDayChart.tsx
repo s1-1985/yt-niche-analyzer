@@ -1,6 +1,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicPublishDay } from '../types/database';
 
 interface Props {
@@ -18,6 +19,8 @@ interface DayEntry {
 }
 
 export function PublishDayChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   // Aggregate across all topics by day of week
   const byDay = new Map<number, { count: number; totalViews: number; viewsWeighted: number }>();
   for (const row of data) {
@@ -50,11 +53,15 @@ export function PublishDayChart({ data }: Props) {
       <p className="chart-desc">
         曜日別の平均再生数（全ジャンル集計）。バズりやすい曜日がわかる
       </p>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={reordered} margin={{ left: 20 }}>
+      <ResponsiveContainer width="100%" height={isMobile ? 220 : 300}>
+        <BarChart data={reordered} margin={{ left: isMobile ? 5 : 20 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="day" tick={{ fontSize: 14 }} />
-          <YAxis tick={{ fontSize: 11 }} />
+          <XAxis dataKey="day" tick={{ fontSize: isMobile ? 12 : 14 }} />
+          <YAxis
+            tick={{ fontSize: isMobile ? 9 : 11 }}
+            width={isMobile ? 40 : 60}
+            tickFormatter={isMobile ? ((v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)) : undefined}
+          />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;

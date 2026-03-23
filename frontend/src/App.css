@@ -843,15 +843,194 @@ tbody tr:hover {
 
 /* ====== Responsive ====== */
 @media (max-width: 640px) {
-  .charts {
-    grid-template-columns: 1fr;
+  .app {
+    padding: 12px 8px;
+  }
+
+  .header {
+    margin-bottom: 16px;
+  }
+
+  .header h1 {
+    font-size: 1.3rem;
+  }
+
+  .header p {
+    font-size: 0.8rem;
+  }
+
+  .time-filter {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .time-filter-btn {
+    font-size: 0.7rem;
+    padding: 5px 10px;
   }
 
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
   }
 
-  .header h1 {
-    font-size: 1.4rem;
+  .kpi-card {
+    padding: 12px 8px;
+  }
+
+  .kpi-title {
+    font-size: 0.65rem;
+  }
+
+  .kpi-value {
+    font-size: 1.1rem;
+  }
+
+  .kpi-sub {
+    font-size: 0.65rem;
+  }
+
+  .charts {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .chart-card {
+    padding: 12px 8px;
+  }
+
+  .chart-card h3 {
+    font-size: 0.9rem;
+  }
+
+  .chart-desc {
+    font-size: 0.7rem;
+    margin-bottom: 8px;
+  }
+
+  .section-divider {
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+  }
+
+  .section-title {
+    font-size: 1rem;
+  }
+
+  .section-desc {
+    font-size: 0.7rem;
+  }
+
+  .charts-full {
+    margin-bottom: 16px;
+  }
+
+  .matrix-legend {
+    gap: 8px;
+    font-size: 0.65rem;
+  }
+
+  .modal-overlay {
+    padding: 0;
+  }
+
+  .modal-content {
+    border-radius: 0;
+    max-height: 100vh;
+    height: 100vh;
+  }
+
+  .modal-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+
+  .modal-header h2 {
+    font-size: 1rem;
+  }
+
+  .modal-stats {
+    width: 100%;
+    font-size: 0.7rem;
+  }
+
+  .modal-body {
+    padding: 12px 16px;
+  }
+
+  .modal-tab {
+    font-size: 0.75rem;
+    padding: 10px 12px;
+  }
+
+  .video-card {
+    gap: 8px;
+    padding: 10px 8px;
+  }
+
+  .video-thumb {
+    width: 80px;
+    height: 45px;
+  }
+
+  .video-title {
+    font-size: 0.8rem;
+  }
+
+  .video-meta {
+    font-size: 0.65rem;
+  }
+
+  .video-stats {
+    font-size: 0.7rem;
+  }
+
+  .overlap-pair {
+    min-width: auto;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .overlap-item {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tag-name {
+    min-width: 80px;
+    font-size: 0.75rem;
+  }
+
+  .ai-prompt-section {
+    padding: 16px 12px;
+  }
+
+  .ai-prompt-copy-btn {
+    font-size: 0.8rem;
+    padding: 10px 20px;
+    width: 100%;
+  }
+
+  .ai-prompt-preview-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .table-section {
+    margin-bottom: 16px;
+  }
+
+  table {
+    font-size: 0.75rem;
+  }
+
+  thead th {
+    padding: 6px 8px;
+  }
+
+  tbody td {
+    padding: 6px 8px;
   }
 }

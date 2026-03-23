@@ -1,6 +1,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { TopicCountryDistribution } from '../types/database';
 
 interface Props {
@@ -32,7 +33,13 @@ const COUNTRY_NAMES: Record<string, string> = {
   Unknown: '不明',
 };
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
 export function CountryChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   // Aggregate across all topics by country
   const byCountry = new Map<string, { channels: number; subs: number }>();
   for (const row of data) {
@@ -42,6 +49,7 @@ export function CountryChart({ data }: Props) {
     byCountry.set(row.country, cur);
   }
 
+  const itemCount = isMobile ? 10 : 15;
   const chartData: ChartEntry[] = Array.from(byCountry.entries())
     .map(([country, vals]) => ({
       country: COUNTRY_NAMES[country] ?? country,
@@ -49,7 +57,9 @@ export function CountryChart({ data }: Props) {
       total_subscribers: vals.subs,
     }))
     .sort((a, b) => b.channel_count - a.channel_count)
-    .slice(0, 15);
+    .slice(0, itemCount);
+
+  const chartHeight = isMobile ? itemCount * 36 + 40 : 400;
 
   return (
     <div className="chart-card">
@@ -57,11 +67,17 @@ export function CountryChart({ data }: Props) {
       <p className="chart-desc">
         チャンネルの所在国。日本の割合が少ないジャンル = 日本語コンテンツの穴がある可能性
       </p>
-      <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" tick={{ fontSize: 11 }} />
-          <YAxis type="category" dataKey="country" width={90} tick={{ fontSize: 12 }} />
+          <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 11 }} />
+          <YAxis
+            type="category"
+            dataKey="country"
+            width={isMobile ? 60 : 90}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+            tickFormatter={(v) => truncate(v, isMobile ? 6 : 20)}
+          />
           <Tooltip
             content={({ payload }) => {
               if (!payload?.length) return null;
