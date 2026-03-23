@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { useSupabaseQuery } from './hooks/useSupabaseQuery';
 import { KpiCard } from './components/KpiCard';
 import { GapScoreChart } from './components/GapScoreChart';
@@ -5,6 +6,7 @@ import { CompetitionChart } from './components/CompetitionChart';
 import { SuccessRateChart } from './components/SuccessRateChart';
 import { AiPenetrationChart } from './components/AiPenetrationChart';
 import { TopicTable } from './components/TopicTable';
+import { TopicDetail } from './components/TopicDetail';
 import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration } from './types/database';
 import './App.css';
 
@@ -13,6 +15,8 @@ function App() {
   const competition = useSupabaseQuery<CompetitionConcentration>('competition_concentration');
   const successRate = useSupabaseQuery<NewChannelSuccessRate>('new_channel_success_rate');
   const aiPen = useSupabaseQuery<AiPenetration>('ai_penetration');
+
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
   const isLoading = topics.loading || competition.loading || successRate.loading || aiPen.loading;
   const hasError = topics.error || competition.error || successRate.error || aiPen.error;
@@ -28,6 +32,18 @@ function App() {
   const avgLikeRate = subTopics.length > 0
     ? (subTopics.reduce((s, t) => s + t.like_rate_pct, 0) / subTopics.length).toFixed(2)
     : '0';
+
+  const handleTopicClick = useCallback((topicId: string) => {
+    setSelectedTopicId(topicId);
+  }, []);
+
+  // Find topic name for the selected topic
+  const selectedTopicName = selectedTopicId
+    ? (() => {
+        const t = topics.data.find((t) => t.topic_id === selectedTopicId);
+        return t ? (t.name_ja ?? t.topic_name) : selectedTopicId;
+      })()
+    : '';
 
   return (
     <div className="app">
@@ -71,16 +87,24 @@ function App() {
           </section>
 
           <section className="charts">
-            <GapScoreChart data={topics.data} />
-            <CompetitionChart data={competition.data} />
-            <SuccessRateChart data={successRate.data} />
-            <AiPenetrationChart data={aiPen.data} />
+            <GapScoreChart data={topics.data} onTopicClick={handleTopicClick} />
+            <CompetitionChart data={competition.data} onTopicClick={handleTopicClick} />
+            <SuccessRateChart data={successRate.data} onTopicClick={handleTopicClick} />
+            <AiPenetrationChart data={aiPen.data} onTopicClick={handleTopicClick} />
           </section>
 
           <section className="table-section">
-            <TopicTable data={topics.data} />
+            <TopicTable data={topics.data} onTopicClick={handleTopicClick} />
           </section>
         </>
+      )}
+
+      {selectedTopicId && (
+        <TopicDetail
+          topicId={selectedTopicId}
+          topicName={selectedTopicName}
+          onClose={() => setSelectedTopicId(null)}
+        />
       )}
 
       <footer className="footer">

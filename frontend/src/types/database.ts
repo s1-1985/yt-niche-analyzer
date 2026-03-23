@@ -51,6 +51,33 @@ export interface AiPenetration {
   ai_penetration_pct: number;
 }
 
+export interface VideoRanking {
+  id: string;
+  title: string;
+  channel_id: string;
+  channel_title: string | null;
+  published_at: string;
+  duration_seconds: number;
+  topic_ids: string[];
+  has_ai_keywords: boolean;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  channel_subscribers: number;
+  buzz_score: number;
+}
+
+export interface ChannelRanking {
+  id: string;
+  title: string;
+  published_at: string;
+  country: string | null;
+  topic_ids: string[];
+  subscriber_count: number;
+  view_count: number;
+  video_count: number;
+}
+
 export interface CollectionLog {
   id: number;
   topic_id: string;

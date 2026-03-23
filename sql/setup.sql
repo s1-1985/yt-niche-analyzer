@@ -354,6 +354,55 @@ JOIN videos v ON t.id = ANY(v.topic_ids)
 GROUP BY t.id, t.name, t.name_ja;
 
 -- ============================================================
+-- ビュー: 動画ランキング（ドリルダウン用）
+-- ============================================================
+CREATE OR REPLACE VIEW video_ranking AS
+SELECT DISTINCT ON (v.id)
+    v.id,
+    v.title,
+    v.channel_id,
+    c.title AS channel_title,
+    v.published_at,
+    v.duration_seconds,
+    v.topic_ids,
+    v.has_ai_keywords,
+    vs.view_count,
+    vs.like_count,
+    vs.comment_count,
+    cs.subscriber_count AS channel_subscribers,
+    CASE
+        WHEN cs.subscriber_count > 0
+        THEN ROUND(vs.view_count::NUMERIC / cs.subscriber_count, 1)
+        ELSE 0
+    END AS buzz_score
+FROM videos v
+JOIN video_snapshots vs ON v.id = vs.video_id
+LEFT JOIN channels c ON v.channel_id = c.id
+LEFT JOIN (
+    SELECT DISTINCT ON (channel_id) channel_id, subscriber_count
+    FROM channel_snapshots
+    ORDER BY channel_id, snapshot_date DESC
+) cs ON v.channel_id = cs.channel_id
+ORDER BY v.id, vs.snapshot_date DESC;
+
+-- ============================================================
+-- ビュー: チャンネルランキング（ドリルダウン用）
+-- ============================================================
+CREATE OR REPLACE VIEW channel_ranking AS
+SELECT DISTINCT ON (c.id)
+    c.id,
+    c.title,
+    c.published_at,
+    c.country,
+    c.topic_ids,
+    cs.subscriber_count,
+    cs.view_count,
+    cs.video_count
+FROM channels c
+JOIN channel_snapshots cs ON c.id = cs.channel_id
+ORDER BY c.id, cs.snapshot_date DESC;
+
+-- ============================================================
 -- RPC関数: 古いスナップショット削除（容量管理）
 -- ============================================================
 CREATE OR REPLACE FUNCTION cleanup_old_snapshots()
