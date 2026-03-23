@@ -476,6 +476,43 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
+/* ====== Full-width charts ====== */
+.charts-full {
+  margin-bottom: 32px;
+}
+
+.charts-full .chart-card {
+  width: 100%;
+}
+
+.niche-score-card {
+  border: 1px solid #10b98133;
+}
+
+/* ====== Matrix legend ====== */
+.matrix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.matrix-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.matrix-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 /* ====== Footer ====== */
 .footer {
   text-align: center;
