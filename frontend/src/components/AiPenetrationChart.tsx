@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { AiPenetration } from '../types/database';
 
 interface Props {
@@ -42,7 +43,10 @@ export function AiPenetrationChart({ data, onTopicClick }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>AI動画浸透度</h3>
+      <div className="chart-title-row">
+        <h3>AI動画浸透度</h3>
+        <HelpButton {...HELP_TEXTS.aiPenetration} />
+      </div>
       <p className="chart-desc">タイトル・説明にAIキーワードを含む動画の割合（クリックで詳細）</p>
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>

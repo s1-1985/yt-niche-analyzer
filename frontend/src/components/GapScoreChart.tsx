@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicSummary } from '../types/database';
 
 interface Props {
@@ -40,7 +41,10 @@ export function GapScoreChart({ data, onTopicClick }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>需給ギャップスコア TOP {itemCount}</h3>
+      <div className="chart-title-row">
+        <h3>需給ギャップスコア TOP {itemCount}</h3>
+        <HelpButton {...HELP_TEXTS.gapScore} />
+      </div>
       <p className="chart-desc">平均再生数 / チャンネル数 = 需要に対する供給の少なさ（クリックで詳細）</p>
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 10 : 100 }}>

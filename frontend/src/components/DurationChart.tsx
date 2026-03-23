@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicDurationStats } from '../types/database';
 
 interface Props {
@@ -52,7 +53,10 @@ export function DurationChart({ data, onTopicClick }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>動画尺の最適ゾーン</h3>
+      <div className="chart-title-row">
+        <h3>動画尺の最適ゾーン</h3>
+        <HelpButton {...HELP_TEXTS.duration} />
+      </div>
       <p className="chart-desc">
         ジャンル別の中央値動画長（分）。何分の動画を作ればそのジャンルの「普通」に合うかがわかる（クリックで詳細）
       </p>

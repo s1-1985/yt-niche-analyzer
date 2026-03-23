@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicSummary } from '../types/database';
 
 interface Props {
@@ -43,7 +44,10 @@ export function EngagementDepthChart({ data, onTopicClick }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>エンゲージメント深度</h3>
+      <div className="chart-title-row">
+        <h3>エンゲージメント深度</h3>
+        <HelpButton {...HELP_TEXTS.engagementDepth} />
+      </div>
       <p className="chart-desc">
         コメント率 / いいね率 = 「見て終わり」vs「語りたくなる」。高い = コミュニティ形成しやすい（クリックで詳細）
       </p>

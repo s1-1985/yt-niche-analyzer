@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicPublishDay } from '../types/database';
 
 interface Props {
@@ -49,7 +50,10 @@ export function PublishDayChart({ data }: Props) {
 
   return (
     <div className="chart-card">
-      <h3>投稿曜日と平均再生数</h3>
+      <div className="chart-title-row">
+        <h3>投稿曜日と平均再生数</h3>
+        <HelpButton {...HELP_TEXTS.publishDay} />
+      </div>
       <p className="chart-desc">
         曜日別の平均再生数（全ジャンル集計）。バズりやすい曜日がわかる
       </p>

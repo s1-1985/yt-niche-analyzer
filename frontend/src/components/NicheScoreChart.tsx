@@ -2,6 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { HelpButton, HELP_TEXTS } from './HelpButton';
 import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration } from '../types/database';
 
 interface Props {
@@ -88,7 +89,10 @@ export function NicheScoreChart({ topics, competition, successRate, aiPenetratio
 
   return (
     <div className="chart-card niche-score-card">
-      <h3>ニッチ推奨スコア TOP {itemCount}</h3>
+      <div className="chart-title-row">
+        <h3>ニッチ推奨スコア TOP {itemCount}</h3>
+        <HelpButton {...HELP_TEXTS.nicheScore} />
+      </div>
       <p className="chart-desc">
         需給ギャップ(35%) + 競合の少なさ(25%) + 新規成功率(25%) + AI未開拓度(15%) の総合スコア
       </p>
