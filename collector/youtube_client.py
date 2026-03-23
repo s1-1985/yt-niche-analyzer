@@ -5,10 +5,16 @@ from datetime import datetime, timedelta, timezone
 
 import isodate
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from topic_ids import AI_KEYWORDS
 
 logger = logging.getLogger(__name__)
+
+
+class QuotaExceededError(Exception):
+    """YouTube API クオータ超過"""
+    pass
 
 
 class YouTubeClient:
@@ -21,8 +27,8 @@ class YouTubeClient:
                                 query: str | None = None) -> list[str]:
         """キーワード検索で動画IDリストを取得（search.list: 100 quota units）
 
-        topicId パラメータは YouTube API で結果が返らないケースが多いため、
-        query（トピック名）を併用してキーワード検索にフォールバックする。
+        topicId は YouTube API で結果が返らなくなっているため、
+        query（トピック名）によるキーワード検索を使用する。
         """
         published_after = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
 
@@ -35,25 +41,26 @@ class YouTubeClient:
                 maxResults=max_results,
                 publishedAfter=published_after,
             )
-            # まず topicId で試す
-            params["topicId"] = topic_id
+
+            # topicId は機能しないため、直接キーワード検索を使用
+            if query:
+                params["q"] = query
+            else:
+                params["topicId"] = topic_id
+
             response = self.youtube.search().list(**params).execute()
             self.quota_used += 100
 
             video_ids = [item["id"]["videoId"] for item in response.get("items", [])]
-
-            # topicId で結果が0件かつ query がある場合、キーワード検索にフォールバック
-            if not video_ids and query:
-                logger.info(f"topicId={topic_id} returned 0 results, falling back to q={query}")
-                params.pop("topicId")
-                params["q"] = query
-                response = self.youtube.search().list(**params).execute()
-                self.quota_used += 100
-                video_ids = [item["id"]["videoId"] for item in response.get("items", [])]
-
             logger.info(f"search.list topic={topic_id} order={order}: {len(video_ids)} videos")
             return video_ids
 
+        except HttpError as e:
+            if e.resp.status == 403 and "quotaExceeded" in str(e):
+                logger.error(f"YouTube API quota exceeded at {self.quota_used} units")
+                raise QuotaExceededError(f"Quota exceeded after {self.quota_used} units")
+            logger.error(f"search.list failed for {topic_id}: {e}")
+            return []
         except Exception as e:
             logger.error(f"search.list failed for {topic_id}: {e}")
             return []
