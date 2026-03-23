@@ -68,25 +68,46 @@ def main():
         # 2. videos.list で詳細取得
         videos = yt.get_video_details(all_video_ids)
 
-        # 3. ユニークなchannel_idを抽出してchannels.list
+        # 3. 検索に使った topic_id を各動画の topic_ids に注入
+        #    YouTube API の topicDetails.topicIds は親レベルしか返さないため、
+        #    キーワード検索で収集した動画に対象 topic_id を明示的に紐づける
+        parent_id = topic_info.get("parent")
+        for v in videos:
+            existing = v.get("topic_ids") or []
+            injected = set(existing)
+            injected.add(topic_id)
+            if parent_id:
+                injected.add(parent_id)
+            v["topic_ids"] = list(injected)
+
+        # 4. ユニークなchannel_idを抽出してchannels.list
         channel_ids = list({v["channel_id"] for v in videos if v.get("channel_id")})
         channels = yt.get_channel_details(channel_ids)
 
-        # 4. Supabase に書き込み（チャンネルを先に入れて外部キー制約を満たす）
+        # チャンネルにも topic_id を注入（new_channel_success_rate ビュー用）
+        for ch in channels:
+            existing = ch.get("topic_ids") or []
+            injected = set(existing)
+            injected.add(topic_id)
+            if parent_id:
+                injected.add(parent_id)
+            ch["topic_ids"] = list(injected)
+
+        # 5. Supabase に書き込み（チャンネルを先に入れて外部キー制約を満たす）
         n_channels = upsert_channels(sb, channels)
         n_videos = upsert_videos(sb, videos)
 
         total_videos += n_videos
         total_channels += n_channels
 
-        # 5. 収集ログ記録
+        # 6. 収集ログ記録
         log_collection(sb, topic_id, n_videos, n_channels, yt.quota_used)
 
         # 統計表示
         stats = compute_collection_stats(videos, channels)
         logger.info(f"Topic {topic_id} stats: {stats}")
 
-    # 6. 古いスナップショット削除（容量管理）
+    # 7. 古いスナップショット削除（容量管理）
     cleanup_old_snapshots(sb)
 
     logger.info(
