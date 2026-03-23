@@ -7,12 +7,22 @@ import { EntryMatrixChart } from './components/EntryMatrixChart';
 import { CompetitionChart } from './components/CompetitionChart';
 import { SuccessRateChart } from './components/SuccessRateChart';
 import { EngagementMapChart } from './components/EngagementMapChart';
+import { EngagementDepthChart } from './components/EngagementDepthChart';
 import { AiPenetrationChart } from './components/AiPenetrationChart';
 import { DurationChart } from './components/DurationChart';
 import { ChannelSizeChart } from './components/ChannelSizeChart';
+import { CategoryRadarChart } from './components/CategoryRadarChart';
+import { PublishDayChart } from './components/PublishDayChart';
+import { ChannelGrowthChart } from './components/ChannelGrowthChart';
+import { TopTagsChart } from './components/TopTagsChart';
+import { CountryChart } from './components/CountryChart';
+import { TopicOverlapChart } from './components/TopicOverlapChart';
 import { TopicTable } from './components/TopicTable';
 import { TopicDetail } from './components/TopicDetail';
-import type { TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration, TopicDurationStats, TopicChannelSize } from './types/database';
+import type {
+  TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
+  TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
+} from './types/database';
 import './App.css';
 
 function App() {
@@ -22,6 +32,8 @@ function App() {
   const aiPen = useSupabaseQuery<AiPenetration>('ai_penetration');
   const duration = useSupabaseQuery<TopicDurationStats>('topic_duration_stats');
   const channelSize = useSupabaseQuery<TopicChannelSize>('topic_channel_size');
+  const publishDay = useSupabaseQuery<TopicPublishDay>('topic_publish_day');
+  const countryDist = useSupabaseQuery<TopicCountryDistribution>('topic_country_distribution');
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
@@ -91,6 +103,7 @@ function App() {
 
       {!isLoading && !hasError && topics.data.length > 0 && (
         <>
+          {/* === KPI Cards === */}
           <section className="kpi-grid">
             <KpiCard title="総動画数" value={totalVideos.toLocaleString()} />
             <KpiCard title="総チャンネル数" value={totalChannels.toLocaleString()} color="#10b981" />
@@ -115,7 +128,12 @@ function App() {
             />
           </section>
 
-          {/* Primary recommendation */}
+          {/* === Section 1: 参入ジャンルの総合判断 === */}
+          <div className="section-divider">
+            <h2 className="section-title">参入ジャンルの総合判断</h2>
+            <p className="section-desc">まずはここを見て、どのジャンルに参入すべきかの大枠を掴む</p>
+          </div>
+
           <section className="charts-full">
             <NicheScoreChart
               topics={topics.data}
@@ -126,17 +144,26 @@ function App() {
             />
           </section>
 
-          {/* Strategy matrix */}
           <section className="charts">
             <EntryMatrixChart
               topics={topics.data}
               competition={competition.data}
               onTopicClick={handleTopicClick}
             />
-            <EngagementMapChart data={topics.data} onTopicClick={handleTopicClick} />
+            <CategoryRadarChart
+              topics={topics.data}
+              competition={competition.data}
+              successRate={successRate.data}
+              aiPenetration={aiPen.data}
+            />
           </section>
 
-          {/* Detailed analysis */}
+          {/* === Section 2: 需給と競合の詳細分析 === */}
+          <div className="section-divider">
+            <h2 className="section-title">需給と競合の詳細分析</h2>
+            <p className="section-desc">需要・供給・競合の具体的な数値で深掘り</p>
+          </div>
+
           <section className="charts">
             <GapScoreChart data={topics.data} onTopicClick={handleTopicClick} />
             <CompetitionChart data={competition.data} onTopicClick={handleTopicClick} />
@@ -147,7 +174,23 @@ function App() {
             <AiPenetrationChart data={aiPen.data} onTopicClick={handleTopicClick} />
           </section>
 
-          {/* Content strategy */}
+          {/* === Section 3: エンゲージメント分析 === */}
+          <div className="section-divider">
+            <h2 className="section-title">エンゲージメント分析</h2>
+            <p className="section-desc">視聴者の反応の質を見て、伸びやすいジャンルを特定</p>
+          </div>
+
+          <section className="charts">
+            <EngagementMapChart data={topics.data} onTopicClick={handleTopicClick} />
+            <EngagementDepthChart data={topics.data} onTopicClick={handleTopicClick} />
+          </section>
+
+          {/* === Section 4: コンテンツ戦略 === */}
+          <div className="section-divider">
+            <h2 className="section-title">コンテンツ戦略</h2>
+            <p className="section-desc">参入先が決まったら、どんな動画を作るかの戦略を立てる</p>
+          </div>
+
           {(duration.data.length > 0 || channelSize.data.length > 0) && (
             <section className="charts">
               {duration.data.length > 0 && (
@@ -159,6 +202,31 @@ function App() {
             </section>
           )}
 
+          {publishDay.data.length > 0 && (
+            <section className="charts">
+              <PublishDayChart data={publishDay.data} />
+              <ChannelGrowthChart onTopicClick={handleTopicClick} />
+            </section>
+          )}
+
+          {/* === Section 5: 市場の構造分析 === */}
+          <div className="section-divider">
+            <h2 className="section-title">市場の構造分析</h2>
+            <p className="section-desc">タグ・国別・ジャンル相関から市場構造を理解</p>
+          </div>
+
+          <section className="charts">
+            <TopTagsChart onTopicClick={handleTopicClick} />
+            {countryDist.data.length > 0 && (
+              <CountryChart data={countryDist.data} />
+            )}
+          </section>
+
+          <section className="charts-full">
+            <TopicOverlapChart onTopicClick={handleTopicClick} />
+          </section>
+
+          {/* === Data Table === */}
           <section className="table-section">
             <TopicTable data={topics.data} onTopicClick={handleTopicClick} />
           </section>

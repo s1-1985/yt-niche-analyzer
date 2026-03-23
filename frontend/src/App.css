@@ -513,6 +513,197 @@ tbody tr:hover {
   display: inline-block;
 }
 
+/* ====== Section Dividers ====== */
+.section-divider {
+  margin: 40px 0 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border);
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ====== Tag selector ====== */
+.tag-topic-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tag-topic-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tag-topic-btn:hover {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.tag-topic-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* ====== Tag list ====== */
+.tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+
+.tag-rank {
+  color: var(--text-muted);
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+}
+
+.tag-name {
+  min-width: 120px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-bar-wrap {
+  flex: 1;
+  height: 14px;
+  background: var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.tag-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--pink));
+  border-radius: 7px;
+  transition: width 0.3s;
+}
+
+.tag-count {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  min-width: 40px;
+  text-align: right;
+}
+
+.tag-views {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  min-width: 70px;
+  text-align: right;
+}
+
+.tag-detail-btn {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+}
+
+.tag-detail-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ====== Overlap list ====== */
+.overlap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overlap-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.overlap-pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.overlap-topic {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.overlap-topic:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.overlap-connector {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.overlap-bar-wrap {
+  flex: 1;
+  height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.overlap-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #22d3ee);
+  border-radius: 8px;
+  transition: width 0.3s;
+}
+
+.overlap-count {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  min-width: 40px;
+  text-align: right;
+}
+
 /* ====== Footer ====== */
 .footer {
   text-align: center;
