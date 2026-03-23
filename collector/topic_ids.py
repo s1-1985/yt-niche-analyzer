@@ -1,0 +1,86 @@
+"""YouTube API キュレーション済み topicId 定義マスタ"""
+
+TOPIC_IDS = {
+    # Music
+    "/m/04rlf": {"name": "Music", "name_ja": "音楽", "parent": None, "category": "Music"},
+    "/m/02mscn": {"name": "Christian music", "name_ja": "クリスチャン音楽", "parent": "/m/04rlf", "category": "Music"},
+    "/m/0ggq0m": {"name": "Classical music", "name_ja": "クラシック音楽", "parent": "/m/04rlf", "category": "Music"},
+    "/m/01lyv": {"name": "Country", "name_ja": "カントリー", "parent": "/m/04rlf", "category": "Music"},
+    "/m/02lkt": {"name": "Electronic music", "name_ja": "電子音楽", "parent": "/m/04rlf", "category": "Music"},
+    "/m/0glt670": {"name": "Hip hop music", "name_ja": "ヒップホップ", "parent": "/m/04rlf", "category": "Music"},
+    "/m/05rwpb": {"name": "Independent music", "name_ja": "インディー音楽", "parent": "/m/04rlf", "category": "Music"},
+    "/m/03_d0": {"name": "Jazz", "name_ja": "ジャズ", "parent": "/m/04rlf", "category": "Music"},
+    "/m/028sqc": {"name": "Music of Asia", "name_ja": "アジア音楽", "parent": "/m/04rlf", "category": "Music"},
+    "/m/0g293": {"name": "Music of Latin America", "name_ja": "ラテン音楽", "parent": "/m/04rlf", "category": "Music"},
+    "/m/064t9": {"name": "Pop music", "name_ja": "ポップ", "parent": "/m/04rlf", "category": "Music"},
+    "/m/06cqb": {"name": "Reggae", "name_ja": "レゲエ", "parent": "/m/04rlf", "category": "Music"},
+    "/m/06j6l": {"name": "Rhythm and blues", "name_ja": "R&B", "parent": "/m/04rlf", "category": "Music"},
+    "/m/06by7": {"name": "Rock music", "name_ja": "ロック", "parent": "/m/04rlf", "category": "Music"},
+    "/m/0gywn": {"name": "Soul music", "name_ja": "ソウル", "parent": "/m/04rlf", "category": "Music"},
+    # Gaming
+    "/m/0bzvm2": {"name": "Gaming", "name_ja": "ゲーム", "parent": None, "category": "Gaming"},
+    "/m/025zzc": {"name": "Action game", "name_ja": "アクション", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/02ntfj": {"name": "Action-adventure game", "name_ja": "アクションアドベンチャー", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/0b1vjn": {"name": "Casual game", "name_ja": "カジュアルゲーム", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/02hygl": {"name": "Music video game", "name_ja": "音楽ゲーム", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/04q1x3q": {"name": "Puzzle video game", "name_ja": "パズルゲーム", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/01sjng": {"name": "Racing video game", "name_ja": "レースゲーム", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/0403l3g": {"name": "Role-playing video game", "name_ja": "RPG", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/021bp2": {"name": "Simulation video game", "name_ja": "シミュレーション", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/022dc6": {"name": "Sports game", "name_ja": "スポーツゲーム", "parent": "/m/0bzvm2", "category": "Gaming"},
+    "/m/03hf_rm": {"name": "Strategy video game", "name_ja": "ストラテジー", "parent": "/m/0bzvm2", "category": "Gaming"},
+    # Sports
+    "/m/06ntj": {"name": "Sports", "name_ja": "スポーツ", "parent": None, "category": "Sports"},
+    "/m/0jm_": {"name": "American football", "name_ja": "アメフト", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/018jz": {"name": "Baseball", "name_ja": "野球", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/018w8": {"name": "Basketball", "name_ja": "バスケ", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/01cgz": {"name": "Boxing", "name_ja": "ボクシング", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/09xp_": {"name": "Cricket", "name_ja": "クリケット", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/02vx4": {"name": "Football", "name_ja": "サッカー", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/037hz": {"name": "Golf", "name_ja": "ゴルフ", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/03tmr": {"name": "Ice hockey", "name_ja": "アイスホッケー", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/01h7lh": {"name": "Mixed martial arts", "name_ja": "格闘技", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/0410tth": {"name": "Motorsport", "name_ja": "モータースポーツ", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/07bs0": {"name": "Tennis", "name_ja": "テニス", "parent": "/m/06ntj", "category": "Sports"},
+    "/m/02_7t": {"name": "Volleyball", "name_ja": "バレーボール", "parent": "/m/06ntj", "category": "Sports"},
+    # Entertainment
+    "/m/02jjt": {"name": "Entertainment", "name_ja": "エンタメ", "parent": None, "category": "Entertainment"},
+    "/m/09kqc": {"name": "Humor", "name_ja": "ユーモア", "parent": "/m/02jjt", "category": "Entertainment"},
+    "/m/02vxn": {"name": "Movies", "name_ja": "映画", "parent": "/m/02jjt", "category": "Entertainment"},
+    "/m/05qjc": {"name": "Performing arts", "name_ja": "舞台芸術", "parent": "/m/02jjt", "category": "Entertainment"},
+    "/m/066wd": {"name": "Professional wrestling", "name_ja": "プロレス", "parent": "/m/02jjt", "category": "Entertainment"},
+    "/m/0f2f9": {"name": "TV shows", "name_ja": "テレビ番組", "parent": "/m/02jjt", "category": "Entertainment"},
+    # Lifestyle
+    "/m/019_rr": {"name": "Lifestyle", "name_ja": "ライフスタイル", "parent": None, "category": "Lifestyle"},
+    "/m/032tl": {"name": "Fashion", "name_ja": "ファッション", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/027x7n": {"name": "Fitness", "name_ja": "フィットネス", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/02wbm": {"name": "Food", "name_ja": "料理", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/03glg": {"name": "Hobby", "name_ja": "趣味", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/068hy": {"name": "Pets", "name_ja": "ペット", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/041xxh": {"name": "Physical attractiveness (Beauty)", "name_ja": "美容", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/07c1v": {"name": "Technology", "name_ja": "テクノロジー", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/07bxq": {"name": "Tourism", "name_ja": "旅行", "parent": "/m/019_rr", "category": "Lifestyle"},
+    "/m/07yv9": {"name": "Vehicles", "name_ja": "乗り物", "parent": "/m/019_rr", "category": "Lifestyle"},
+    # Society
+    "/m/098wr": {"name": "Society", "name_ja": "社会", "parent": None, "category": "Society"},
+    "/m/09s1f": {"name": "Business", "name_ja": "ビジネス", "parent": "/m/098wr", "category": "Society"},
+    "/m/0kt51": {"name": "Health", "name_ja": "健康", "parent": "/m/098wr", "category": "Society"},
+    "/m/01h6rj": {"name": "Military", "name_ja": "軍事", "parent": "/m/098wr", "category": "Society"},
+    "/m/05qt0": {"name": "Politics", "name_ja": "政治", "parent": "/m/098wr", "category": "Society"},
+    "/m/06bvp": {"name": "Religion", "name_ja": "宗教", "parent": "/m/098wr", "category": "Society"},
+    # Knowledge
+    "/m/01k8wb": {"name": "Knowledge", "name_ja": "知識", "parent": None, "category": "Knowledge"},
+}
+
+AI_KEYWORDS = [
+    # 英語
+    "ai generated", "ai-generated", "artificial intelligence",
+    "made with ai", "ai art", "ai animation", "ai video",
+    "midjourney", "stable diffusion", "dall-e", "dalle",
+    "sora", "runway", "pika", "kling", "luma",
+    "ai music", "suno", "udio",
+    # 日本語
+    "AI生成", "AI動画", "AIアニメ", "AI音楽",
+    "人工知能", "AI制作", "AIで作",
+    "AIイラスト", "AI画像", "AIボイス", "AI歌",
+]
