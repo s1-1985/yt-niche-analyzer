@@ -118,3 +118,56 @@ export interface TopicChannelSize {
   large_pct: number;
   mega_pct: number;
 }
+
+export interface TopicPublishDay {
+  topic_id: string;
+  topic_name: string;
+  name_ja: string | null;
+  parent_id: string | null;
+  dow: number;
+  video_count: number;
+  avg_views: number;
+  total_views: number;
+}
+
+export interface ChannelGrowthEfficiency {
+  channel_id: string;
+  title: string;
+  published_at: string;
+  country: string | null;
+  topic_ids: string[];
+  subscriber_count: number;
+  view_count: number;
+  video_count: number;
+  age_days: number;
+  subs_per_day: number;
+  views_per_video: number;
+}
+
+export interface TopicPopularTag {
+  topic_id: string;
+  topic_name: string;
+  name_ja: string | null;
+  tag: string;
+  usage_count: number;
+  avg_views: number;
+  rank: number;
+}
+
+export interface TopicCountryDistribution {
+  topic_id: string;
+  topic_name: string;
+  name_ja: string | null;
+  parent_id: string | null;
+  country: string;
+  channel_count: number;
+  total_subscribers: number;
+}
+
+export interface TopicOverlap {
+  topic_a: string;
+  name_a: string | null;
+  topic_b: string;
+  name_b: string | null;
+  shared_channels: number;
+}
