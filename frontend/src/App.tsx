@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { useSupabaseQuery } from './hooks/useSupabaseQuery';
+import { useFilteredQuery, type TimePeriod } from './hooks/useFilteredQuery';
+import { TimePeriodFilter } from './components/TimePeriodFilter';
 import { KpiCard } from './components/KpiCard';
 import { NicheScoreChart } from './components/NicheScoreChart';
 import { GapScoreChart } from './components/GapScoreChart';
@@ -17,25 +18,33 @@ import { ChannelGrowthChart } from './components/ChannelGrowthChart';
 import { TopTagsChart } from './components/TopTagsChart';
 import { CountryChart } from './components/CountryChart';
 import { TopicOverlapChart } from './components/TopicOverlapChart';
+import { AiPromptCopyButton } from './components/AiPromptCopyButton';
 import { TopicTable } from './components/TopicTable';
 import { TopicDetail } from './components/TopicDetail';
 import type {
   TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
   TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
+  TopicPopularTag, TopicOverlap,
 } from './types/database';
 import './App.css';
 
 function App() {
-  const topics = useSupabaseQuery<TopicSummary>('topic_summary');
-  const competition = useSupabaseQuery<CompetitionConcentration>('competition_concentration');
-  const successRate = useSupabaseQuery<NewChannelSuccessRate>('new_channel_success_rate');
-  const aiPen = useSupabaseQuery<AiPenetration>('ai_penetration');
-  const duration = useSupabaseQuery<TopicDurationStats>('topic_duration_stats');
-  const channelSize = useSupabaseQuery<TopicChannelSize>('topic_channel_size');
-  const publishDay = useSupabaseQuery<TopicPublishDay>('topic_publish_day');
-  const countryDist = useSupabaseQuery<TopicCountryDistribution>('topic_country_distribution');
+  const [period, setPeriod] = useState<TimePeriod>('all');
+
+  const topics = useFilteredQuery<TopicSummary>('topic_summary', period);
+  const competition = useFilteredQuery<CompetitionConcentration>('competition_concentration', period);
+  const successRate = useFilteredQuery<NewChannelSuccessRate>('new_channel_success_rate', period);
+  const aiPen = useFilteredQuery<AiPenetration>('ai_penetration', period);
+  const duration = useFilteredQuery<TopicDurationStats>('topic_duration_stats', period);
+  const channelSize = useFilteredQuery<TopicChannelSize>('topic_channel_size', period);
+  const publishDay = useFilteredQuery<TopicPublishDay>('topic_publish_day', period);
+  const countryDist = useFilteredQuery<TopicCountryDistribution>('topic_country_distribution', period);
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+
+  // Collect tag and overlap data from child components for AI prompt
+  const [tagsData, setTagsData] = useState<TopicPopularTag[]>([]);
+  const [overlapData, setOverlapData] = useState<TopicOverlap[]>([]);
 
   const isLoading = topics.loading || competition.loading || successRate.loading || aiPen.loading;
   const hasError = topics.error || competition.error || successRate.error || aiPen.error;
@@ -52,12 +61,10 @@ function App() {
     ? (subTopics.reduce((s, t) => s + t.like_rate_pct, 0) / subTopics.length).toFixed(2)
     : '0';
 
-  // Lowest competition topic
   const lowestComp = competition.data.length > 0
     ? [...competition.data].sort((a, b) => a.top5_share_pct - b.top5_share_pct)[0]
     : null;
 
-  // Highest success rate topic
   const bestSuccess = successRate.data.filter((s) => s.new_channel_count >= 3).length > 0
     ? [...successRate.data].filter((s) => s.new_channel_count >= 3).sort((a, b) => b.success_rate_pct - a.success_rate_pct)[0]
     : null;
@@ -66,7 +73,6 @@ function App() {
     setSelectedTopicId(topicId);
   }, []);
 
-  // Find topic name for the selected topic
   const selectedTopicName = selectedTopicId
     ? (() => {
         const t = topics.data.find((t) => t.topic_id === selectedTopicId);
@@ -79,6 +85,7 @@ function App() {
       <header className="header">
         <h1>YouTube Niche Analyzer</h1>
         <p>ジャンル別の需給ギャップ・競合分析ダッシュボード</p>
+        <TimePeriodFilter value={period} onChange={setPeriod} />
       </header>
 
       {isLoading && (
@@ -205,7 +212,7 @@ function App() {
           {publishDay.data.length > 0 && (
             <section className="charts">
               <PublishDayChart data={publishDay.data} />
-              <ChannelGrowthChart onTopicClick={handleTopicClick} />
+              <ChannelGrowthChart period={period} onTopicClick={handleTopicClick} />
             </section>
           )}
 
@@ -216,19 +223,36 @@ function App() {
           </div>
 
           <section className="charts">
-            <TopTagsChart onTopicClick={handleTopicClick} />
+            <TopTagsChart period={period} onTagsLoaded={setTagsData} onTopicClick={handleTopicClick} />
             {countryDist.data.length > 0 && (
               <CountryChart data={countryDist.data} />
             )}
           </section>
 
           <section className="charts-full">
-            <TopicOverlapChart onTopicClick={handleTopicClick} />
+            <TopicOverlapChart period={period} onOverlapLoaded={setOverlapData} onTopicClick={handleTopicClick} />
           </section>
 
           {/* === Data Table === */}
           <section className="table-section">
             <TopicTable data={topics.data} onTopicClick={handleTopicClick} />
+          </section>
+
+          {/* === AI Prompt Copy === */}
+          <section className="ai-prompt-wrapper">
+            <AiPromptCopyButton
+              period={period}
+              topics={topics.data}
+              competition={competition.data}
+              successRate={successRate.data}
+              aiPenetration={aiPen.data}
+              duration={duration.data}
+              channelSize={channelSize.data}
+              publishDay={publishDay.data}
+              countryDist={countryDist.data}
+              tags={tagsData}
+              overlap={overlapData}
+            />
           </section>
         </>
       )}

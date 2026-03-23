@@ -5,8 +5,10 @@ import {
 } from 'recharts';
 import { supabase } from '../lib/supabase';
 import type { ChannelGrowthEfficiency } from '../types/database';
+import type { TimePeriod } from '../hooks/useFilteredQuery';
 
 interface Props {
+  period: TimePeriod;
   onTopicClick?: (topicId: string) => void;
 }
 
@@ -19,21 +21,42 @@ interface ChartEntry {
   topic_ids: string[];
 }
 
-export function ChannelGrowthChart({ onTopicClick }: Props) {
+function getMinDate(period: TimePeriod): string | null {
+  if (period === 'all') return null;
+  const now = new Date();
+  switch (period) {
+    case '24h': now.setHours(now.getHours() - 24); break;
+    case '1w': now.setDate(now.getDate() - 7); break;
+    case '1m': now.setMonth(now.getMonth() - 1); break;
+    case '3m': now.setMonth(now.getMonth() - 3); break;
+  }
+  return now.toISOString();
+}
+
+export function ChannelGrowthChart({ period, onTopicClick }: Props) {
   const [data, setData] = useState<ChannelGrowthEfficiency[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from('channel_growth_efficiency')
-      .select('*')
-      .order('subs_per_day', { ascending: false })
-      .limit(200)
-      .then(({ data: d }) => {
-        setData((d as ChannelGrowthEfficiency[]) ?? []);
-        setLoading(false);
-      });
-  }, []);
+    setLoading(true);
+    const minDate = getMinDate(period);
+
+    const fetchData = async () => {
+      let result;
+      if (period === 'all') {
+        result = await supabase
+          .from('channel_growth_efficiency')
+          .select('*')
+          .order('subs_per_day', { ascending: false })
+          .limit(200);
+      } else {
+        result = await supabase.rpc('fn_channel_growth_efficiency', { p_min_date: minDate });
+      }
+      setData((result.data as ChannelGrowthEfficiency[])?.slice(0, 200) ?? []);
+      setLoading(false);
+    };
+    fetchData();
+  }, [period]);
 
   if (loading) return null;
   if (data.length === 0) return null;

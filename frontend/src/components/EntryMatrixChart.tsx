@@ -1,6 +1,6 @@
 import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, ZAxis, ReferenceArea, ReferenceLine, Label,
+  CartesianGrid, ZAxis, ReferenceArea, ReferenceLine, Label, Cell,
 } from 'recharts';
 import type { TopicSummary, CompetitionConcentration } from '../types/database';
 
@@ -131,7 +131,12 @@ export function EntryMatrixChart({ topics, competition, onTopicClick }: Props) {
             onClick={(entry: unknown) => onTopicClick?.((entry as ChartEntry).topic_id)}
           >
             {chartData.map((entry, index) => (
-              <circle key={index} fill={CATEGORY_COLORS[entry.category] ?? '#6366f1'} />
+              <Cell
+                key={index}
+                fill={CATEGORY_COLORS[entry.category] ?? '#6366f1'}
+                stroke="#ffffff"
+                strokeWidth={2}
+              />
             ))}
           </Scatter>
         </ScatterChart>

@@ -1,32 +1,56 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { TopicPopularTag } from '../types/database';
+import type { TimePeriod } from '../hooks/useFilteredQuery';
 
 interface Props {
+  period: TimePeriod;
+  onTagsLoaded?: (tags: TopicPopularTag[]) => void;
   onTopicClick?: (topicId: string) => void;
 }
 
-export function TopTagsChart({ onTopicClick }: Props) {
+function getMinDate(period: TimePeriod): string | null {
+  if (period === 'all') return null;
+  const now = new Date();
+  switch (period) {
+    case '24h': now.setHours(now.getHours() - 24); break;
+    case '1w': now.setDate(now.getDate() - 7); break;
+    case '1m': now.setMonth(now.getMonth() - 1); break;
+    case '3m': now.setMonth(now.getMonth() - 3); break;
+  }
+  return now.toISOString();
+}
+
+export function TopTagsChart({ period, onTagsLoaded, onTopicClick }: Props) {
   const [data, setData] = useState<TopicPopularTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase
-      .from('topic_popular_tags')
-      .select('*')
-      .order('topic_id')
-      .order('rank')
-      .then(({ data: d }) => {
-        setData((d as TopicPopularTag[]) ?? []);
-        setLoading(false);
-      });
-  }, []);
+    setLoading(true);
+    const fetchData = async () => {
+      let result;
+      if (period === 'all') {
+        result = await supabase
+          .from('topic_popular_tags')
+          .select('*')
+          .order('topic_id')
+          .order('rank');
+      } else {
+        const minDate = getMinDate(period);
+        result = await supabase.rpc('fn_topic_popular_tags', { p_min_date: minDate });
+      }
+      const d = (result.data as TopicPopularTag[]) ?? [];
+      setData(d);
+      onTagsLoaded?.(d);
+      setLoading(false);
+    };
+    fetchData();
+  }, [period]);
 
   if (loading) return null;
   if (data.length === 0) return null;
 
-  // Get unique topics
   const topicMap = new Map<string, string>();
   for (const row of data) {
     if (!topicMap.has(row.topic_id)) {
