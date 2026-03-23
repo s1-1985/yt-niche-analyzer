@@ -1,10 +1,11 @@
 """YouTube Niche Analyzer — データ収集メインエントリポイント
 
 GitHub Actions (日次 cron) から実行される。
-1. ローテーションで今日のtopicIdグループを決定
-2. 各topicIdで search.list → videos.list → channels.list
-3. Supabase に upsert
-4. 古いスナップショットを削除（容量管理）
+1. 全トピックを最終収集日が古い順に取得
+2. クォータ上限まで可能な限り多くのトピックを処理
+3. 各topicIdで search.list → videos.list → channels.list
+4. Supabase に upsert
+5. 古いスナップショットを削除（容量管理）
 """
 
 import logging
@@ -13,7 +14,7 @@ import sys
 
 from youtube_client import YouTubeClient, QuotaExceededError
 from supabase_client import init_client, upsert_channels, upsert_videos, cleanup_old_snapshots
-from rotation import get_today_topics, log_collection
+from rotation import get_today_topics, log_collection, DAILY_QUOTA_LIMIT, QUOTA_PER_TOPIC
 from metrics import compute_collection_stats
 from topic_ids import TOPIC_IDS
 
@@ -38,15 +39,29 @@ def main():
     yt = YouTubeClient(youtube_api_key)
     sb = init_client(supabase_url, supabase_key)
 
-    # 今日処理するtopicIdグループを取得
+    # 全トピックを最終収集日が古い順に取得
     today_topics = get_today_topics(sb)
-    logger.info(f"Today's topics: {len(today_topics)} topic(s)")
+    logger.info(f"Topics queued: {len(today_topics)} (will process until quota limit)")
 
     total_videos = 0
     total_channels = 0
+    topics_processed = 0
 
     for topic_id in today_topics:
-        logger.info(f"--- Processing topic: {topic_id} ---")
+        # クォータ残量チェック — 次のトピックを処理する余裕がなければ停止
+        remaining = DAILY_QUOTA_LIMIT - yt.quota_used
+        if remaining < QUOTA_PER_TOPIC:
+            logger.info(
+                f"Quota limit approaching: {yt.quota_used}/{DAILY_QUOTA_LIMIT} used. "
+                f"Stopping collection."
+            )
+            break
+
+        logger.info(
+            f"--- Processing topic: {topic_id} "
+            f"({topics_processed + 1}/{len(today_topics)}, "
+            f"quota: {yt.quota_used}/{DAILY_QUOTA_LIMIT}) ---"
+        )
 
         try:
             # 1. search.list で動画IDを取得（再生数順 + 新着順）
@@ -63,6 +78,7 @@ def main():
         if not all_video_ids:
             logger.warning(f"No videos found for {topic_id}")
             log_collection(sb, topic_id, 0, 0, yt.quota_used)
+            topics_processed += 1
             continue
 
         # 2. videos.list で詳細取得
@@ -99,6 +115,7 @@ def main():
 
         total_videos += n_videos
         total_channels += n_channels
+        topics_processed += 1
 
         # 6. 収集ログ記録
         log_collection(sb, topic_id, n_videos, n_channels, yt.quota_used)
@@ -112,8 +129,9 @@ def main():
 
     logger.info(
         f"Collection complete. "
+        f"Processed: {topics_processed}/{len(today_topics)} topics. "
         f"Total: {total_videos} videos, {total_channels} channels. "
-        f"Quota used: {yt.quota_used}"
+        f"Quota used: {yt.quota_used}/{DAILY_QUOTA_LIMIT}"
     )
 
 

@@ -1,7 +1,8 @@
 """ジャンルローテーション管理
 
-全topicIdを3グループに分割し、毎日1グループを処理（3日で全ジャンル1巡）。
-collection_log テーブルで最後に収集した日時を管理し、最も古いグループから優先的に処理する。
+全topicIdを「最終収集日が古い順」にソートし、
+クォータ上限まで可能な限り多くのトピックを処理する。
+collection_log テーブルで最後に収集した日時を管理する。
 """
 
 import logging
@@ -9,24 +10,16 @@ from topic_ids import TOPIC_IDS
 
 logger = logging.getLogger(__name__)
 
-# 全topicIdを7グループに分割（1グループ約10トピック、クオータ内に収める）
-NUM_GROUPS = 7
-
-def _build_groups():
-    all_ids = list(TOPIC_IDS.keys())
-    group_size = len(all_ids) // NUM_GROUPS
-    groups = []
-    for i in range(NUM_GROUPS):
-        start = i * group_size
-        end = start + group_size if i < NUM_GROUPS - 1 else len(all_ids)
-        groups.append(all_ids[start:end])
-    return groups
-
-TOPIC_GROUPS = _build_groups()
+# 1トピックあたりの概算クォータ消費: search×2(200) + videos(2) + channels(2) ≈ 204
+QUOTA_PER_TOPIC = 210  # 余裕を持たせた見積もり
+DAILY_QUOTA_LIMIT = 9500  # 10,000の95%を安全上限とする
 
 
 def get_today_topics(supabase_client) -> list[str]:
-    """collection_logから最も古いグループを特定し、今日処理すべきtopicIdリストを返す"""
+    """collection_logから最終収集日が古い順にトピックを返す（全トピック対象）。
+    呼び出し側がクォータ超過で停止するまで順に処理する。"""
+    all_topic_ids = list(TOPIC_IDS.keys())
+
     try:
         # 各topicIdの最終収集日を取得
         result = supabase_client.table("collection_log") \
@@ -40,31 +33,29 @@ def get_today_topics(supabase_client) -> list[str]:
             if tid not in last_collected:
                 last_collected[tid] = row["collected_at"]
 
-        # 各グループの「最古の収集日」を計算
-        group_scores = []
-        for i, group in enumerate(TOPIC_GROUPS):
-            dates = [last_collected.get(tid) for tid in group]
-            # 未収集のtopicが含まれるグループを最優先
-            if any(d is None for d in dates):
-                group_scores.append((i, ""))
-            else:
-                oldest = min(d for d in dates if d is not None)
-                group_scores.append((i, oldest))
+        # 未収集トピックを最優先、次に最終収集日が古い順
+        def sort_key(tid):
+            ts = last_collected.get(tid)
+            if ts is None:
+                return ""  # 未収集 = 最優先
+            return ts
 
-        # 最も古い（または未収集）グループを選択
-        group_scores.sort(key=lambda x: x[1])
-        selected_group_idx = group_scores[0][0]
-        selected_topics = TOPIC_GROUPS[selected_group_idx]
+        all_topic_ids.sort(key=sort_key)
+
+        uncollected = sum(1 for tid in all_topic_ids if tid not in last_collected)
+        max_processable = DAILY_QUOTA_LIMIT // QUOTA_PER_TOPIC
 
         logger.info(
-            f"Selected group {selected_group_idx + 1}/{len(TOPIC_GROUPS)} "
-            f"with {len(selected_topics)} topics"
+            f"Total topics: {len(all_topic_ids)}, "
+            f"uncollected: {uncollected}, "
+            f"max processable today: {max_processable}"
         )
-        return selected_topics
+
+        return all_topic_ids
 
     except Exception as e:
-        logger.warning(f"Failed to determine rotation, falling back to group 0: {e}")
-        return TOPIC_GROUPS[0]
+        logger.warning(f"Failed to determine rotation order: {e}")
+        return all_topic_ids
 
 
 def log_collection(supabase_client, topic_id: str, videos_collected: int,
