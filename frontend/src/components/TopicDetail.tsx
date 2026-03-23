@@ -137,6 +137,9 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
                     className="video-card buzz-card"
                   >
                     <div className="video-rank buzz-rank">#{i + 1}</div>
+                    {v.thumbnail_url && (
+                      <img className="video-thumb" src={v.thumbnail_url} alt="" loading="lazy" />
+                    )}
                     <div className="video-info">
                       <div className="video-title">{v.title}</div>
                       <div className="video-meta">
@@ -165,6 +168,7 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
                 <thead>
                   <tr>
                     <th>#</th>
+                    <th></th>
                     <th>タイトル</th>
                     <th>チャンネル</th>
                     <th>再生数</th>
@@ -180,6 +184,11 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
                   {videos.map((v, i) => (
                     <tr key={v.id}>
                       <td>{i + 1}</td>
+                      <td>
+                        {v.thumbnail_url && (
+                          <img className="table-thumb" src={v.thumbnail_url} alt="" loading="lazy" />
+                        )}
+                      </td>
                       <td>
                         <a
                           href={`https://www.youtube.com/watch?v=${v.id}`}

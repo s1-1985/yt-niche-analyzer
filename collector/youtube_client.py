@@ -38,6 +38,7 @@ class YouTubeClient:
                 type="video",
                 order=order,
                 regionCode="JP",
+                relevanceLanguage="ja",
                 maxResults=max_results,
                 publishedAfter=published_after,
             )
@@ -137,6 +138,13 @@ class YouTubeClient:
         searchable = f"{title} {description} {' '.join(tags)}".lower()
         has_ai = any(kw.lower() in searchable for kw in AI_KEYWORDS)
 
+        # サムネイルURL（medium → default の順でフォールバック）
+        thumbnails = snippet.get("thumbnails", {})
+        thumbnail_url = (
+            thumbnails.get("medium", {}).get("url")
+            or thumbnails.get("default", {}).get("url")
+        )
+
         return {
             "id": item["id"],
             "channel_id": snippet.get("channelId"),
@@ -148,6 +156,7 @@ class YouTubeClient:
             "tags": tags if tags else None,
             "default_language": snippet.get("defaultLanguage"),
             "has_ai_keywords": has_ai,
+            "thumbnail_url": thumbnail_url,
             "view_count": int(stats.get("viewCount", 0)),
             "like_count": int(stats.get("likeCount", 0)),
             "comment_count": int(stats.get("commentCount", 0)),

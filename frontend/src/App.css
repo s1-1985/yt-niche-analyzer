@@ -395,6 +395,21 @@ tbody tr:hover {
   color: var(--amber);
 }
 
+.video-thumb {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.table-thumb {
+  width: 80px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
 .video-info {
   flex: 1;
   min-width: 0;
