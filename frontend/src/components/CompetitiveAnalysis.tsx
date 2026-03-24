@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { ChannelPatterns } from './ChannelPatterns';
 import type { VideoRanking, ChannelRanking, ChannelGrowthEfficiency } from '../types/database';
 import type { VideoType } from '../hooks/useFilteredQuery';
 
@@ -10,7 +11,7 @@ interface Props {
   selectedCountry?: string | null;
 }
 
-type Tab = 'buzz' | 'popular' | 'channels' | 'growth' | 'outlier';
+type Tab = 'buzz' | 'popular' | 'channels' | 'growth' | 'outlier' | 'patterns';
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -160,6 +161,7 @@ export function CompetitiveAnalysis({ topicId, topicName, videoType = 'all', sel
     { key: 'channels', label: '人気チャンネル', count: topChannels.length },
     { key: 'growth', label: '急成長チャンネル', count: growthChannels.length },
     { key: 'outlier', label: '穴場チャンネル', count: outlierChannels.length },
+    { key: 'patterns', label: '成功パターン', count: 0 },
   ];
 
   return (
@@ -373,6 +375,10 @@ export function CompetitiveAnalysis({ topicId, topicName, videoType = 'all', sel
                 </div>
               )}
             </div>
+          )}
+
+          {tab === 'patterns' && (
+            <ChannelPatterns topicId={topicId} topicName={topicName} />
           )}
         </>
       )}

@@ -81,9 +81,14 @@ export function BuzzPickup({ videoType = 'all' }: Props) {
         vData = vData.filter((v) => v.duration_seconds > 60);
       }
 
-      // Filter out videos with obviously bad subscriber data
+      // Filter out videos with bad data quality
       vData = vData.filter((v) => {
+        // Obviously bad subscriber data
         if (v.buzz_score > 100 && (v.channel_subscribers ?? 0) < 10) return false;
+        // Channel created within 7 days of video publish (likely spam/bot)
+        if (v.channel_subscribers !== null && v.channel_subscribers < 5 && v.buzz_score > 50) return false;
+        // Minimum view count to be considered buzz
+        if (v.view_count < 100) return false;
         return true;
       });
 

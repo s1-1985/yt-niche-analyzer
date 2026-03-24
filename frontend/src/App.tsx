@@ -29,6 +29,11 @@ import { CollectionHistory } from './components/CollectionHistory';
 import { DataStats } from './components/DataStats';
 import { BuzzPickup } from './components/BuzzPickup';
 import { CompetitiveAnalysis } from './components/CompetitiveAnalysis';
+import { TrendChart } from './components/TrendChart';
+import { CsvExportButton } from './components/CsvExportButton';
+import { CrossGenreScore } from './components/CrossGenreScore';
+import { SaturationChart } from './components/SaturationChart';
+import { SectionNav } from './components/SectionNav';
 import type {
   TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
   TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
@@ -141,7 +146,7 @@ function App() {
           return selectedTopicIds.map((id) => {
             const t = topics.data.find((t) => t.topic_id === id);
             return t ? (t.name_ja ?? t.topic_name) : id;
-          }).join(' × ');
+          }).join(' \u00d7 ');
         }
         const t = topics.data.find((t) => t.topic_id === selectedTopicId);
         return t ? (t.name_ja ?? t.topic_name) : selectedTopicId;
@@ -160,6 +165,8 @@ function App() {
 
   return (
     <div className="app">
+      <SectionNav />
+
       <header className="header">
         <h1>YouTube Niche Analyzer</h1>
         <p>ジャンル別の需給ギャップ・競合分析ダッシュボード</p>
@@ -168,6 +175,14 @@ function App() {
             <span>最終更新: {new Date(lastUpdated).toLocaleString('ja-JP')}</span>
             <button className="history-btn" onClick={() => setShowHistory(true)}>更新履歴</button>
             <button className="history-btn" onClick={() => setShowDataStats(true)}>データベース</button>
+            {!isCompetitiveMode && fTopics.length > 0 && (
+              <CsvExportButton
+                topics={fTopics}
+                competition={fCompetition}
+                successRate={fSuccessRate}
+                aiPenetration={fAiPen}
+              />
+            )}
           </div>
         )}
         <div className="top-filter-row">
@@ -213,7 +228,7 @@ function App() {
       {/* Dashboard Mode (cross-genre comparison) */}
       {!isLoading && !hasError && !isCompetitiveMode && fTopics.length > 0 && (
         <>
-          <section className="kpi-grid">
+          <section className="kpi-grid" id="section-kpi" aria-label="主要KPI">
             <KpiCard title="総動画数" value={totalVideos.toLocaleString()} />
             <KpiCard title="総チャンネル数" value={totalChannels.toLocaleString()} color="#10b981" />
             <KpiCard
@@ -238,17 +253,17 @@ function App() {
           </section>
 
           {!selectedCategory && (
-            <section className="charts-full">
+            <section className="charts-full" id="section-buzz" aria-label="Buzz動画ピックアップ">
               <BuzzPickup videoType={videoType} />
             </section>
           )}
 
-          <div className="section-divider">
+          <div className="section-divider" id="section-niche">
             <h2 className="section-title">参入ジャンルの総合判断</h2>
             <p className="section-desc">まずはここを見て、どのジャンルに参入すべきかの大枠を掴む</p>
           </div>
 
-          <section className="charts-full">
+          <section className="charts-full" aria-label="ニッチ推奨スコア">
             <NicheScoreChart
               topics={fTopics} competition={fCompetition}
               successRate={fSuccessRate} aiPenetration={fAiPen}
@@ -256,7 +271,7 @@ function App() {
             />
           </section>
 
-          <section className="charts">
+          <section className="charts" aria-label="参入マトリクス">
             <EntryMatrixChart topics={fTopics} competition={fCompetition} onTopicClick={handleTopicClick} />
             {!selectedCategory && (
               <CategoryRadarChart topics={fTopics} competition={fCompetition}
@@ -264,69 +279,93 @@ function App() {
             )}
           </section>
 
-          <div className="section-divider">
+          <div className="section-divider" id="section-supply-demand">
             <h2 className="section-title">需給と競合の詳細分析</h2>
             <p className="section-desc">需要・供給・競合の具体的な数値で深掘り</p>
           </div>
 
-          <section className="charts">
+          <section className="charts" aria-label="需給・競合分析">
             <GapScoreChart data={fTopics} onTopicClick={handleTopicClick} />
             <CompetitionChart data={fCompetition} onTopicClick={handleTopicClick} />
           </section>
 
-          <section className="charts">
+          <section className="charts" aria-label="成功率・AI浸透度">
             <SuccessRateChart data={fSuccessRate} onTopicClick={handleTopicClick} />
             <AiPenetrationChart data={fAiPen} onTopicClick={handleTopicClick} />
           </section>
 
-          <div className="section-divider">
+          <div className="section-divider" id="section-engagement">
             <h2 className="section-title">エンゲージメント分析</h2>
             <p className="section-desc">視聴者の反応の質を見て、伸びやすいジャンルを特定</p>
           </div>
 
-          <section className="charts">
+          <section className="charts" aria-label="エンゲージメント">
             <EngagementMapChart data={fTopics} onTopicClick={handleTopicClick} />
             <EngagementDepthChart data={fTopics} onTopicClick={handleTopicClick} />
           </section>
 
-          <div className="section-divider">
+          <div className="section-divider" id="section-strategy">
             <h2 className="section-title">コンテンツ戦略</h2>
             <p className="section-desc">参入先が決まったら、どんな動画を作るかの戦略を立てる</p>
           </div>
 
           {(fDuration.length > 0 || fChannelSize.length > 0) && (
-            <section className="charts">
+            <section className="charts" aria-label="尺・規模分析">
               {fDuration.length > 0 && <DurationChart data={fDuration} onTopicClick={handleTopicClick} />}
               {fChannelSize.length > 0 && <ChannelSizeChart data={fChannelSize} onTopicClick={handleTopicClick} />}
             </section>
           )}
 
           {fPublishDay.length > 0 && (
-            <section className="charts">
+            <section className="charts" aria-label="投稿曜日・成長効率">
               <PublishDayChart data={fPublishDay} />
               <ChannelGrowthChart period={period} videoType={videoType} country={selectedCountry} onTopicClick={handleTopicClick} />
             </section>
           )}
 
-          <div className="section-divider">
+          <div className="section-divider" id="section-trend">
+            <h2 className="section-title">トレンド分析</h2>
+            <p className="section-desc">投稿数の推移で市場の成長・衰退を把握</p>
+          </div>
+
+          <section className="charts-full" aria-label="投稿トレンド">
+            <TrendChart onTopicClick={handleTopicClick} />
+          </section>
+
+          <div className="section-divider" id="section-market">
             <h2 className="section-title">市場の構造分析</h2>
             <p className="section-desc">タグ・国別・ジャンル相関から市場構造を理解</p>
           </div>
 
-          <section className="charts">
+          <section className="charts" aria-label="タグ・国別分析">
             <TopTagsChart period={period} videoType={videoType} country={selectedCountry} onTagsLoaded={setTagsData} onTopicClick={handleTopicClick} />
             {fCountryDist.length > 0 && <CountryChart data={fCountryDist} />}
           </section>
 
-          <section className="charts-full">
+          <section className="charts-full" aria-label="ジャンル相関">
             <TopicOverlapChart period={period} videoType={videoType} country={selectedCountry} onOverlapLoaded={setOverlapData} onTopicClick={handleTopicClick} onOverlapClick={handleOverlapClick} />
           </section>
 
-          <section className="table-section">
+          {overlapData.length > 0 && (
+            <section className="charts-full" aria-label="クロスニッチ機会">
+              <CrossGenreScore topics={fTopics} overlap={overlapData} onTopicClick={handleTopicClick} />
+            </section>
+          )}
+
+          <div className="section-divider" id="section-saturation">
+            <h2 className="section-title">飽和予測</h2>
+            <p className="section-desc">チャンネル増加率から将来の競合密度を推定</p>
+          </div>
+
+          <section className="charts-full" aria-label="飽和予測">
+            <SaturationChart topics={fTopics} aiPenetration={fAiPen} onTopicClick={handleTopicClick} />
+          </section>
+
+          <section className="table-section" id="section-table" aria-label="ジャンル別サマリー">
             <TopicTable data={fTopics} onTopicClick={handleTopicClick} />
           </section>
 
-          <section className="ai-prompt-wrapper">
+          <section className="ai-prompt-wrapper" aria-label="AIプロンプト生成">
             <AiPromptCopyButton
               period={period} topics={fTopics} competition={fCompetition}
               successRate={fSuccessRate} aiPenetration={fAiPen}
@@ -351,7 +390,7 @@ function App() {
       {showHistory && <CollectionHistory onClose={() => setShowHistory(false)} />}
       {showDataStats && <DataStats onClose={() => setShowDataStats(false)} />}
 
-      <footer className="footer">
+      <footer className="footer" role="contentinfo">
         <p>YouTube Data API v3 + Supabase | Auto-collected daily via GitHub Actions</p>
       </footer>
     </div>
