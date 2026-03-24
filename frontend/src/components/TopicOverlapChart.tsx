@@ -7,6 +7,7 @@ import type { TimePeriod, VideoType } from '../hooks/useFilteredQuery';
 interface Props {
   period: TimePeriod;
   videoType?: VideoType;
+  country?: string | null;
   onOverlapLoaded?: (data: TopicOverlap[]) => void;
   onTopicClick?: (topicId: string) => void;
 }
@@ -23,7 +24,7 @@ function getMinDate(period: TimePeriod): string | null {
   return now.toISOString();
 }
 
-export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, onTopicClick }: Props) {
+export function TopicOverlapChart({ period, videoType = 'all', country = null, onOverlapLoaded, onTopicClick }: Props) {
   const [data, setData] = useState<TopicOverlap[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,13 +33,13 @@ export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, 
     setLoading(true);
     const fetchData = async () => {
       let result;
-      if (period === 'all' && videoType === 'all') {
+      if (period === 'all' && videoType === 'all' && country === null) {
         result = await supabase.from('topic_overlap').select('*')
           .order('shared_channels', { ascending: false }).limit(30);
       } else {
         const minDate = getMinDate(period);
         result = await supabase.rpc('fn_topic_overlap', {
-          p_min_date: minDate, p_video_type: videoType,
+          p_min_date: minDate, p_video_type: videoType, p_country: country,
         });
       }
       if (cancelled) return;
@@ -50,7 +51,7 @@ export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, 
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [period, videoType]);
+  }, [period, videoType, country]);
 
   if (loading) return null;
   if (data.length === 0) return null;

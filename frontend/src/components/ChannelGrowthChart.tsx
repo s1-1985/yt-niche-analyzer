@@ -13,6 +13,7 @@ import type { TimePeriod, VideoType } from '../hooks/useFilteredQuery';
 interface Props {
   period: TimePeriod;
   videoType?: VideoType;
+  country?: string | null;
   onTopicClick?: (topicId: string) => void;
 }
 
@@ -37,7 +38,7 @@ function getMinDate(period: TimePeriod): string | null {
   return now.toISOString();
 }
 
-export function ChannelGrowthChart({ period, videoType = 'all', onTopicClick }: Props) {
+export function ChannelGrowthChart({ period, videoType = 'all', country = null, onTopicClick }: Props) {
   const isMobile = useIsMobile();
   const [data, setData] = useState<ChannelGrowthEfficiency[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +50,12 @@ export function ChannelGrowthChart({ period, videoType = 'all', onTopicClick }: 
     const minDate = getMinDate(period);
     const fetchData = async () => {
       let result;
-      if (period === 'all' && videoType === 'all') {
+      if (period === 'all' && videoType === 'all' && country === null) {
         result = await supabase.from('channel_growth_efficiency').select('*')
           .order('subs_per_day', { ascending: false }).limit(200);
       } else {
         result = await supabase.rpc('fn_channel_growth_efficiency', {
-          p_min_date: minDate, p_video_type: videoType,
+          p_min_date: minDate, p_video_type: videoType, p_country: country,
         });
       }
       if (cancelled) return;
@@ -63,7 +64,7 @@ export function ChannelGrowthChart({ period, videoType = 'all', onTopicClick }: 
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [period, videoType]);
+  }, [period, videoType, country]);
 
   if (loading) return null;
   if (data.length === 0) return null;

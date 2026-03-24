@@ -32,13 +32,15 @@ function getMinDate(period: TimePeriod): string | null {
 
 /**
  * RPC function経由でフィルタ付きクエリを実行するhook。
- * period === 'all' かつ videoType === 'all' の場合はビュー(view)から直接取得（高速）。
+ * フィルタが全てデフォルト（period='all', videoType='all', country=null）の場合は
+ * ビュー(view)から直接取得（高速）。
  * それ以外の場合は fn_<view名> RPC関数を呼び出す。
  */
 export function useFilteredQuery<T>(
   view: string,
   period: TimePeriod,
   videoType: VideoType = 'all',
+  country: string | null = null,
 ) {
   const [state, setState] = useState<QueryState<T>>({
     data: [],
@@ -56,7 +58,9 @@ export function useFilteredQuery<T>(
         let data: T[] | null;
         let error: { message: string } | null;
 
-        if (period === 'all' && videoType === 'all') {
+        const needsRpc = period !== 'all' || videoType !== 'all' || country !== null;
+
+        if (!needsRpc) {
           const res = await supabase.from(view).select('*');
           data = res.data as T[] | null;
           error = res.error;
@@ -65,6 +69,7 @@ export function useFilteredQuery<T>(
           const res = await supabase.rpc(`fn_${view}`, {
             p_min_date: minDate,
             p_video_type: videoType,
+            p_country: country,
           });
           data = res.data as T[] | null;
           error = res.error;
@@ -73,14 +78,13 @@ export function useFilteredQuery<T>(
         if (cancelled) return;
 
         if (error) {
-          // videoType フィルタが指定されている場合はフォールバックしない
-          // （フィルタなしビューに戻すとフィルタが効かなくなるため）
-          if (videoType !== 'all') {
-            console.error(`RPC fn_${view} failed (videoType=${videoType}):`, error.message);
+          // フィルタが指定されている場合はフォールバックしない
+          if (videoType !== 'all' || country !== null) {
+            console.error(`RPC fn_${view} failed:`, error.message);
             setState({
               data: [],
               loading: false,
-              error: `動画タイプフィルタの適用に失敗しました。SQLマイグレーション(migrate_add_video_type_filter.sql)の実行が必要です。`,
+              error: `フィルタの適用に失敗しました。SQLマイグレーション(migrate_add_country_filter.sql)の実行が必要です。`,
             });
           } else {
             console.warn(`RPC fn_${view} failed, falling back to view:`, error.message);
@@ -106,7 +110,7 @@ export function useFilteredQuery<T>(
     return () => {
       cancelled = true;
     };
-  }, [view, period, videoType]);
+  }, [view, period, videoType, country]);
 
   return state;
 }
