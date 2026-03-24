@@ -146,7 +146,7 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
                       <div className="video-title">{v.title}</div>
                       <div className="video-meta">
                         <span>{v.channel_title ?? 'Unknown'}</span>
-                        <span>登録者 {v.channel_subscribers.toLocaleString()}</span>
+                        <span>登録者 {(v.channel_subscribers ?? 0).toLocaleString()}</span>
                         <span>{timeAgo(v.published_at)}</span>
                         <span>{formatDuration(v.duration_seconds)}</span>
                       </div>
