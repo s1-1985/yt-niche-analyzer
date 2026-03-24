@@ -72,7 +72,7 @@ export function CategoryRadarChart({ topics, competition, successRate, aiPenetra
 
   const ranges = Object.fromEntries(metrics.map((m) => {
     const vals = catData.map((c) => c[m]);
-    return [m, { min: Math.min(...vals), max: Math.max(...vals) }];
+    return [m, { min: vals.length > 0 ? Math.min(...vals) : 0, max: vals.length > 0 ? Math.max(...vals) : 0 }];
   }));
 
   const radarData: RadarEntry[] = metrics.map((m) => {

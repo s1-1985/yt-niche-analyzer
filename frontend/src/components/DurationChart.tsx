@@ -31,7 +31,7 @@ function truncate(s: string, max: number): string {
 
 export function DurationChart({ data, onTopicClick }: Props) {
   const isMobile = useIsMobile();
-  const subTopics = data.filter((d) => d.parent_id !== null);
+  const subTopics = data.filter((d) => d.parent_id !== null && d.video_count > 0);
   const itemCount = isMobile ? 10 : 25;
 
   const sorted = [...subTopics]

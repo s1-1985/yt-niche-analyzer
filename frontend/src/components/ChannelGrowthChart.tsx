@@ -44,6 +44,7 @@ export function ChannelGrowthChart({ period, videoType = 'all', onTopicClick }: 
   const [showList, setShowList] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     const minDate = getMinDate(period);
     const fetchData = async () => {
@@ -56,10 +57,12 @@ export function ChannelGrowthChart({ period, videoType = 'all', onTopicClick }: 
           p_min_date: minDate, p_video_type: videoType,
         });
       }
+      if (cancelled) return;
       setData((result.data as ChannelGrowthEfficiency[])?.slice(0, 200) ?? []);
       setLoading(false);
     };
     fetchData();
+    return () => { cancelled = true; };
   }, [period, videoType]);
 
   if (loading) return null;

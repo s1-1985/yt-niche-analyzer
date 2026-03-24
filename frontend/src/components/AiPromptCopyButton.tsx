@@ -47,7 +47,7 @@ function buildPrompt(props: Props): string {
     const compN = comp ? 100 - comp.top5_share_pct : 50;
     const succN = succ ? succ.success_rate_pct : 0;
     const aiN = ai ? 100 - ai.ai_penetration_pct : 50;
-    const nicheScore = Math.round(gapN * 0.3 + compN * 0.25 + succN * 0.25 + aiN * 0.2);
+    const nicheScore = Math.round(gapN * 0.35 + compN * 0.25 + succN * 0.25 + aiN * 0.15);
     return { ...t, nicheScore, comp, succ, ai };
   }).sort((a, b) => b.nicheScore - a.nicheScore);
 

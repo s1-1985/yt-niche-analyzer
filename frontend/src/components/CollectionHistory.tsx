@@ -6,8 +6,16 @@ interface Props {
   onClose: () => void;
 }
 
+interface TopicName {
+  id: string;
+  name_ja: string | null;
+  name: string;
+  category: string;
+}
+
 export function CollectionHistory({ onClose }: Props) {
   const [logs, setLogs] = useState<CollectionLog[]>([]);
+  const [topicMap, setTopicMap] = useState<Map<string, TopicName>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,17 +25,49 @@ export function CollectionHistory({ onClose }: Props) {
   }, [onClose]);
 
   useEffect(() => {
-    async function fetch() {
-      const res = await supabase
-        .from('collection_log')
-        .select('*')
-        .order('collected_at', { ascending: false })
-        .limit(100);
-      setLogs((res.data as CollectionLog[]) ?? []);
-      setLoading(false);
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        const [logRes, topicRes] = await Promise.all([
+          supabase
+            .from('collection_log')
+            .select('*')
+            .order('collected_at', { ascending: false })
+            .limit(100),
+          supabase
+            .from('topics')
+            .select('id, name, name_ja, category'),
+        ]);
+
+        if (cancelled) return;
+
+        const map = new Map<string, TopicName>();
+        if (topicRes.data) {
+          for (const t of topicRes.data as TopicName[]) {
+            map.set(t.id, t);
+          }
+        }
+        setTopicMap(map);
+        setLogs((logRes.data as CollectionLog[]) ?? []);
+      } catch {
+        // silently fail - empty state will show
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    fetch();
+    fetchData();
+    return () => { cancelled = true; };
   }, []);
+
+  function getTopicLabel(topicId: string): string {
+    const t = topicMap.get(topicId);
+    return t ? (t.name_ja ?? t.name) : topicId;
+  }
+
+  function getCategoryLabel(topicId: string): string | null {
+    const t = topicMap.get(topicId);
+    return t?.category ?? null;
+  }
 
   // Group by date
   const grouped = new Map<string, CollectionLog[]>();
@@ -60,16 +100,20 @@ export function CollectionHistory({ onClose }: Props) {
                   </span>
                 </div>
                 <div className="history-items">
-                  {dayLogs.map((log) => (
-                    <div key={log.id} className="history-item">
-                      <span className="history-time">
-                        {new Date(log.collected_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      <span className="history-topic">{log.topic_id}</span>
-                      <span className="history-stat">{log.videos_collected}動画</span>
-                      <span className="history-stat">{log.channels_collected}ch</span>
-                    </div>
-                  ))}
+                  {dayLogs.map((log) => {
+                    const category = getCategoryLabel(log.topic_id);
+                    return (
+                      <div key={log.id} className="history-item">
+                        <span className="history-time">
+                          {new Date(log.collected_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {category && <span className="history-category">{category}</span>}
+                        <span className="history-topic">{getTopicLabel(log.topic_id)}</span>
+                        <span className="history-stat">{log.videos_collected}動画</span>
+                        <span className="history-stat">{log.channels_collected}ch</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
