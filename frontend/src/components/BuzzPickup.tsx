@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { VideoRanking } from '../types/database';
+import type { VideoType } from '../hooks/useFilteredQuery';
 
 interface TopicName {
   id: string;
   name_ja: string | null;
   name: string;
+}
+
+interface Props {
+  videoType?: VideoType;
 }
 
 function formatDuration(seconds: number): string {
@@ -26,7 +31,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)}ヶ月前`;
 }
 
-export function BuzzPickup() {
+export function BuzzPickup({ videoType = 'all' }: Props) {
   const [videos, setVideos] = useState<VideoRanking[]>([]);
   const [topicMap, setTopicMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -49,7 +54,7 @@ export function BuzzPickup() {
         .gte('published_at', since.toISOString())
         .gt('buzz_score', 0)
         .order('buzz_score', { ascending: false })
-        .limit(20),
+        .limit(100),
     ]).then(([topicRes, videoRes]) => {
       if (cancelled) return;
 
@@ -66,12 +71,28 @@ export function BuzzPickup() {
         setLoading(false);
         return;
       }
-      setVideos((videoRes.data as VideoRanking[]) ?? []);
+
+      let vData = (videoRes.data as VideoRanking[]) ?? [];
+
+      // Apply video type filter
+      if (videoType === 'short') {
+        vData = vData.filter((v) => v.duration_seconds <= 60);
+      } else if (videoType === 'normal') {
+        vData = vData.filter((v) => v.duration_seconds > 60);
+      }
+
+      // Filter out videos with obviously bad subscriber data
+      vData = vData.filter((v) => {
+        if (v.buzz_score > 100 && (v.channel_subscribers ?? 0) < 10) return false;
+        return true;
+      });
+
+      setVideos(vData.slice(0, 20));
       setLoading(false);
     });
 
     return () => { cancelled = true; };
-  }, [days]);
+  }, [days, videoType]);
 
   function getGenreTags(topicIds: string[]): string[] {
     return topicIds

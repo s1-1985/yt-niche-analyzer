@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { VideoRanking, ChannelRanking, ChannelGrowthEfficiency } from '../types/database';
+import type { VideoType } from '../hooks/useFilteredQuery';
 
 interface Props {
   topicId: string;
   topicName: string;
+  videoType?: VideoType;
   selectedCountry?: string | null;
 }
 
@@ -28,7 +30,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)}ヶ月前`;
 }
 
-export function CompetitiveAnalysis({ topicId, topicName, selectedCountry }: Props) {
+export function CompetitiveAnalysis({ topicId, topicName, videoType = 'all', selectedCountry }: Props) {
   const [videos, setVideos] = useState<VideoRanking[]>([]);
   const [channels, setChannels] = useState<ChannelRanking[]>([]);
   const [growth, setGrowth] = useState<ChannelGrowthEfficiency[]>([]);
@@ -66,7 +68,17 @@ export function CompetitiveAnalysis({ topicId, topicName, selectedCountry }: Pro
         setLoading(false);
         return;
       }
-      setVideos((vRes.data as VideoRanking[]) ?? []);
+
+      let vData = (vRes.data as VideoRanking[]) ?? [];
+
+      // Apply video type filter
+      if (videoType === 'short') {
+        vData = vData.filter((v) => v.duration_seconds <= 60);
+      } else if (videoType === 'normal') {
+        vData = vData.filter((v) => v.duration_seconds > 60);
+      }
+
+      setVideos(vData);
       setChannels((cRes.data as ChannelRanking[]) ?? []);
       // Filter growth data to this topic
       const allGrowth = (gRes.data as ChannelGrowthEfficiency[]) ?? [];
@@ -75,7 +87,7 @@ export function CompetitiveAnalysis({ topicId, topicName, selectedCountry }: Pro
     });
 
     return () => { cancelled = true; };
-  }, [topicId]);
+  }, [topicId, videoType]);
 
   // Country filter: filter channels and videos by selected country
   const filteredChannels = selectedCountry
@@ -94,8 +106,13 @@ export function CompetitiveAnalysis({ topicId, topicName, selectedCountry }: Pro
     ? growth.filter((g) => g.country === selectedCountry)
     : growth;
 
-  // Derived data
-  const buzzVideos = [...filteredVideos]
+  // Derived data (filter out videos with obviously bad subscriber data)
+  const reliableVideos = filteredVideos.filter((v) => {
+    if (v.buzz_score > 100 && (v.channel_subscribers ?? 0) < 10) return false;
+    return true;
+  });
+
+  const buzzVideos = [...reliableVideos]
     .filter((v) => v.buzz_score > 0)
     .sort((a, b) => b.buzz_score - a.buzz_score)
     .slice(0, 20);

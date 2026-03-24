@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { VideoRanking, ChannelRanking } from '../types/database';
+import type { VideoType } from '../hooks/useFilteredQuery';
 
 interface Props {
   topicId: string;
+  topicIds?: string[];
   topicName: string;
+  videoType?: VideoType;
   onClose: () => void;
 }
 
@@ -28,12 +31,15 @@ function timeAgo(dateStr: string): string {
 
 type Tab = 'buzz' | 'videos' | 'channels';
 
-export function TopicDetail({ topicId, topicName, onClose }: Props) {
+export function TopicDetail({ topicId, topicIds, topicName, videoType = 'all', onClose }: Props) {
   const [videos, setVideos] = useState<VideoRanking[]>([]);
   const [channels, setChannels] = useState<ChannelRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('buzz');
+
+  // When multiple topicIds are given (e.g. from overlap chart), use them all; otherwise use single topicId
+  const filterTopicIds = topicIds && topicIds.length > 0 ? topicIds : [topicId];
 
   useEffect(() => {
     let cancelled = false;
@@ -42,17 +48,18 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
       setLoading(true);
       setError(null);
 
+      // .contains with multiple IDs checks that topic_ids array contains ALL of them
       const [vRes, cRes] = await Promise.all([
         supabase
           .from('video_ranking')
           .select('*')
-          .contains('topic_ids', [topicId])
+          .contains('topic_ids', filterTopicIds)
           .order('view_count', { ascending: false })
           .limit(100),
         supabase
           .from('channel_ranking')
           .select('*')
-          .contains('topic_ids', [topicId])
+          .contains('topic_ids', filterTopicIds)
           .order('subscriber_count', { ascending: false })
           .limit(100),
       ]);
@@ -65,14 +72,24 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
         return;
       }
 
-      setVideos((vRes.data as VideoRanking[]) ?? []);
-      setChannels((cRes.data as ChannelRanking[]) ?? []);
+      let vData = (vRes.data as VideoRanking[]) ?? [];
+      const cData = (cRes.data as ChannelRanking[]) ?? [];
+
+      // Apply video type filter
+      if (videoType === 'short') {
+        vData = vData.filter((v) => v.duration_seconds <= 60);
+      } else if (videoType === 'normal') {
+        vData = vData.filter((v) => v.duration_seconds > 60);
+      }
+
+      setVideos(vData);
+      setChannels(cData);
       setLoading(false);
     }
 
     fetchData();
     return () => { cancelled = true; };
-  }, [topicId]);
+  }, [topicId, topicIds?.join(','), videoType]);
 
   // Close on Escape key
   useEffect(() => {
@@ -81,7 +98,13 @@ export function TopicDetail({ topicId, topicName, onClose }: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const buzzVideos = [...videos]
+  // Filter out videos with obviously bad subscriber data (buzz score inflated by bad data)
+  const reliableVideos = videos.filter((v) => {
+    if (v.buzz_score > 100 && (v.channel_subscribers ?? 0) < 10) return false;
+    return true;
+  });
+
+  const buzzVideos = [...reliableVideos]
     .filter((v) => v.buzz_score > 0)
     .sort((a, b) => b.buzz_score - a.buzz_score)
     .slice(0, 10);
