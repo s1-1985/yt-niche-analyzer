@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useFilteredQuery, type TimePeriod, type VideoType } from './hooks/useFilteredQuery';
 import { supabase } from './lib/supabase';
 import { TimePeriodFilter } from './components/TimePeriodFilter';
 import { VideoTypeFilter } from './components/VideoTypeFilter';
+import { TopicFilter } from './components/TopicFilter';
 import { KpiCard } from './components/KpiCard';
 import { NicheScoreChart } from './components/NicheScoreChart';
 import { GapScoreChart } from './components/GapScoreChart';
@@ -24,7 +25,9 @@ import { AiPromptCopyButton } from './components/AiPromptCopyButton';
 import { TopicTable } from './components/TopicTable';
 import { TopicDetail } from './components/TopicDetail';
 import { CollectionHistory } from './components/CollectionHistory';
+import { DataStats } from './components/DataStats';
 import { BuzzPickup } from './components/BuzzPickup';
+import { CompetitiveAnalysis } from './components/CompetitiveAnalysis';
 import type {
   TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
   TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
@@ -35,6 +38,10 @@ import './App.css';
 function App() {
   const [period, setPeriod] = useState<TimePeriod>('all');
   const [videoType, setVideoType] = useState<VideoType>('all');
+
+  // Genre filter state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedGenreId, setSelectedGenreId] = useState<string | null>(null);
 
   const topics = useFilteredQuery<TopicSummary>('topic_summary', period, videoType);
   const competition = useFilteredQuery<CompetitionConcentration>('competition_concentration', period, videoType);
@@ -47,12 +54,11 @@ function App() {
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showDataStats, setShowDataStats] = useState(false);
 
-  // Collect tag and overlap data from child components for AI prompt
   const [tagsData, setTagsData] = useState<TopicPopularTag[]>([]);
   const [overlapData, setOverlapData] = useState<TopicOverlap[]>([]);
 
-  // Last update time
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     supabase.from('collection_log').select('collected_at')
@@ -67,8 +73,31 @@ function App() {
   const hasError = topics.error || competition.error || successRate.error || aiPen.error;
   const isEmpty = !isLoading && !hasError && topics.data.length === 0;
 
-  // KPI calculations
-  const subTopics = topics.data.filter((t) => t.parent_id !== null);
+  // Filter data by selected category
+  const filterByCategory = useCallback(<T extends { topic_id?: string; topic_name?: string; name_ja?: string | null; parent_id?: string | null; category?: string }>(
+    data: T[],
+  ): T[] => {
+    if (!selectedCategory) return data;
+    return data.filter((d) => {
+      if ('category' in d && d.category) return d.category === selectedCategory;
+      // For types without category, look up from topics
+      const topic = topics.data.find((t) => t.topic_id === (d as { topic_id?: string }).topic_id);
+      return topic ? topic.category === selectedCategory : true;
+    });
+  }, [selectedCategory, topics.data]);
+
+  // Filtered data for charts
+  const fTopics = useMemo(() => filterByCategory(topics.data), [filterByCategory, topics.data]);
+  const fCompetition = useMemo(() => filterByCategory(competition.data), [filterByCategory, competition.data]);
+  const fSuccessRate = useMemo(() => filterByCategory(successRate.data), [filterByCategory, successRate.data]);
+  const fAiPen = useMemo(() => filterByCategory(aiPen.data), [filterByCategory, aiPen.data]);
+  const fDuration = useMemo(() => filterByCategory(duration.data), [filterByCategory, duration.data]);
+  const fChannelSize = useMemo(() => filterByCategory(channelSize.data), [filterByCategory, channelSize.data]);
+  const fPublishDay = useMemo(() => filterByCategory(publishDay.data), [filterByCategory, publishDay.data]);
+  const fCountryDist = useMemo(() => filterByCategory(countryDist.data), [filterByCategory, countryDist.data]);
+
+  // KPI calculations (from filtered data)
+  const subTopics = fTopics.filter((t) => t.parent_id !== null);
   const totalVideos = subTopics.reduce((s, t) => s + t.total_videos, 0);
   const totalChannels = subTopics.reduce((s, t) => s + t.total_channels, 0);
   const topGap = subTopics.length > 0
@@ -78,12 +107,17 @@ function App() {
     ? (subTopics.reduce((s, t) => s + t.like_rate_pct, 0) / subTopics.length).toFixed(2)
     : '0';
 
-  const lowestComp = competition.data.length > 0
-    ? [...competition.data].sort((a, b) => a.top5_share_pct - b.top5_share_pct)[0]
+  const fCompSub = fCompetition.filter((c) => {
+    const t = topics.data.find((t) => t.topic_id === c.topic_id);
+    return t ? t.parent_id !== null : true;
+  });
+  const lowestComp = fCompSub.length > 0
+    ? [...fCompSub].sort((a, b) => a.top5_share_pct - b.top5_share_pct)[0]
     : null;
 
-  const bestSuccess = successRate.data.filter((s) => s.new_channel_count >= 3).length > 0
-    ? [...successRate.data].filter((s) => s.new_channel_count >= 3).sort((a, b) => b.success_rate_pct - a.success_rate_pct)[0]
+  const fSuccSub = fSuccessRate.filter((s) => s.new_channel_count >= 3);
+  const bestSuccess = fSuccSub.length > 0
+    ? [...fSuccSub].sort((a, b) => b.success_rate_pct - a.success_rate_pct)[0]
     : null;
 
   const handleTopicClick = useCallback((topicId: string) => {
@@ -97,6 +131,16 @@ function App() {
       })()
     : '';
 
+  // Competitive analysis mode: selected genre name
+  const selectedGenreName = selectedGenreId
+    ? (() => {
+        const t = topics.data.find((t) => t.topic_id === selectedGenreId);
+        return t ? (t.name_ja ?? t.topic_name) : selectedGenreId;
+      })()
+    : '';
+
+  const isCompetitiveMode = !!selectedGenreId;
+
   return (
     <div className="app">
       <header className="header">
@@ -106,12 +150,21 @@ function App() {
           <div className="last-updated">
             <span>最終更新: {new Date(lastUpdated).toLocaleString('ja-JP')}</span>
             <button className="history-btn" onClick={() => setShowHistory(true)}>更新履歴</button>
+            <button className="history-btn" onClick={() => setShowDataStats(true)}>データベース</button>
           </div>
         )}
-        <div className="filter-row">
-          <TimePeriodFilter value={period} onChange={setPeriod} />
-          <VideoTypeFilter value={videoType} onChange={setVideoType} />
-        </div>
+        <TopicFilter
+          selectedCategory={selectedCategory}
+          selectedTopicId={selectedGenreId}
+          onCategoryChange={setSelectedCategory}
+          onTopicChange={setSelectedGenreId}
+        />
+        {!isCompetitiveMode && (
+          <div className="filter-row">
+            <TimePeriodFilter value={period} onChange={setPeriod} />
+            <VideoTypeFilter value={videoType} onChange={setVideoType} />
+          </div>
+        )}
       </header>
 
       {isLoading && (
@@ -134,7 +187,13 @@ function App() {
         </div>
       )}
 
-      {!isLoading && !hasError && topics.data.length > 0 && (
+      {/* Competitive Analysis Mode */}
+      {!isLoading && !hasError && isCompetitiveMode && (
+        <CompetitiveAnalysis topicId={selectedGenreId} topicName={selectedGenreName} />
+      )}
+
+      {/* Dashboard Mode (cross-genre comparison) */}
+      {!isLoading && !hasError && !isCompetitiveMode && fTopics.length > 0 && (
         <>
           <section className="kpi-grid">
             <KpiCard title="総動画数" value={totalVideos.toLocaleString()} />
@@ -160,9 +219,11 @@ function App() {
             />
           </section>
 
-          <section className="charts-full">
-            <BuzzPickup />
-          </section>
+          {!selectedCategory && (
+            <section className="charts-full">
+              <BuzzPickup />
+            </section>
+          )}
 
           <div className="section-divider">
             <h2 className="section-title">参入ジャンルの総合判断</h2>
@@ -171,16 +232,18 @@ function App() {
 
           <section className="charts-full">
             <NicheScoreChart
-              topics={topics.data} competition={competition.data}
-              successRate={successRate.data} aiPenetration={aiPen.data}
+              topics={fTopics} competition={fCompetition}
+              successRate={fSuccessRate} aiPenetration={fAiPen}
               onTopicClick={handleTopicClick}
             />
           </section>
 
           <section className="charts">
-            <EntryMatrixChart topics={topics.data} competition={competition.data} onTopicClick={handleTopicClick} />
-            <CategoryRadarChart topics={topics.data} competition={competition.data}
-              successRate={successRate.data} aiPenetration={aiPen.data} />
+            <EntryMatrixChart topics={fTopics} competition={fCompetition} onTopicClick={handleTopicClick} />
+            {!selectedCategory && (
+              <CategoryRadarChart topics={fTopics} competition={fCompetition}
+                successRate={fSuccessRate} aiPenetration={fAiPen} />
+            )}
           </section>
 
           <div className="section-divider">
@@ -189,13 +252,13 @@ function App() {
           </div>
 
           <section className="charts">
-            <GapScoreChart data={topics.data} onTopicClick={handleTopicClick} />
-            <CompetitionChart data={competition.data} onTopicClick={handleTopicClick} />
+            <GapScoreChart data={fTopics} onTopicClick={handleTopicClick} />
+            <CompetitionChart data={fCompetition} onTopicClick={handleTopicClick} />
           </section>
 
           <section className="charts">
-            <SuccessRateChart data={successRate.data} onTopicClick={handleTopicClick} />
-            <AiPenetrationChart data={aiPen.data} onTopicClick={handleTopicClick} />
+            <SuccessRateChart data={fSuccessRate} onTopicClick={handleTopicClick} />
+            <AiPenetrationChart data={fAiPen} onTopicClick={handleTopicClick} />
           </section>
 
           <div className="section-divider">
@@ -204,8 +267,8 @@ function App() {
           </div>
 
           <section className="charts">
-            <EngagementMapChart data={topics.data} onTopicClick={handleTopicClick} />
-            <EngagementDepthChart data={topics.data} onTopicClick={handleTopicClick} />
+            <EngagementMapChart data={fTopics} onTopicClick={handleTopicClick} />
+            <EngagementDepthChart data={fTopics} onTopicClick={handleTopicClick} />
           </section>
 
           <div className="section-divider">
@@ -213,16 +276,16 @@ function App() {
             <p className="section-desc">参入先が決まったら、どんな動画を作るかの戦略を立てる</p>
           </div>
 
-          {(duration.data.length > 0 || channelSize.data.length > 0) && (
+          {(fDuration.length > 0 || fChannelSize.length > 0) && (
             <section className="charts">
-              {duration.data.length > 0 && <DurationChart data={duration.data} onTopicClick={handleTopicClick} />}
-              {channelSize.data.length > 0 && <ChannelSizeChart data={channelSize.data} onTopicClick={handleTopicClick} />}
+              {fDuration.length > 0 && <DurationChart data={fDuration} onTopicClick={handleTopicClick} />}
+              {fChannelSize.length > 0 && <ChannelSizeChart data={fChannelSize} onTopicClick={handleTopicClick} />}
             </section>
           )}
 
-          {publishDay.data.length > 0 && (
+          {fPublishDay.length > 0 && (
             <section className="charts">
-              <PublishDayChart data={publishDay.data} />
+              <PublishDayChart data={fPublishDay} />
               <ChannelGrowthChart period={period} videoType={videoType} onTopicClick={handleTopicClick} />
             </section>
           )}
@@ -234,7 +297,7 @@ function App() {
 
           <section className="charts">
             <TopTagsChart period={period} videoType={videoType} onTagsLoaded={setTagsData} onTopicClick={handleTopicClick} />
-            {countryDist.data.length > 0 && <CountryChart data={countryDist.data} />}
+            {fCountryDist.length > 0 && <CountryChart data={fCountryDist} />}
           </section>
 
           <section className="charts-full">
@@ -242,15 +305,15 @@ function App() {
           </section>
 
           <section className="table-section">
-            <TopicTable data={topics.data} onTopicClick={handleTopicClick} />
+            <TopicTable data={fTopics} onTopicClick={handleTopicClick} />
           </section>
 
           <section className="ai-prompt-wrapper">
             <AiPromptCopyButton
-              period={period} topics={topics.data} competition={competition.data}
-              successRate={successRate.data} aiPenetration={aiPen.data}
-              duration={duration.data} channelSize={channelSize.data}
-              publishDay={publishDay.data} countryDist={countryDist.data}
+              period={period} topics={fTopics} competition={fCompetition}
+              successRate={fSuccessRate} aiPenetration={fAiPen}
+              duration={fDuration} channelSize={fChannelSize}
+              publishDay={fPublishDay} countryDist={fCountryDist}
               tags={tagsData} overlap={overlapData}
             />
           </section>
@@ -263,6 +326,7 @@ function App() {
       )}
 
       {showHistory && <CollectionHistory onClose={() => setShowHistory(false)} />}
+      {showDataStats && <DataStats onClose={() => setShowDataStats(false)} />}
 
       <footer className="footer">
         <p>YouTube Data API v3 + Supabase | Auto-collected daily via GitHub Actions</p>
