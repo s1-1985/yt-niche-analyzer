@@ -7,6 +7,7 @@ import type { TimePeriod, VideoType } from '../hooks/useFilteredQuery';
 interface Props {
   period: TimePeriod;
   videoType?: VideoType;
+  country?: string | null;
   onTagsLoaded?: (tags: TopicPopularTag[]) => void;
   onTopicClick?: (topicId: string) => void;
 }
@@ -23,7 +24,7 @@ function getMinDate(period: TimePeriod): string | null {
   return now.toISOString();
 }
 
-export function TopTagsChart({ period, videoType = 'all', onTagsLoaded, onTopicClick }: Props) {
+export function TopTagsChart({ period, videoType = 'all', country = null, onTagsLoaded, onTopicClick }: Props) {
   const [data, setData] = useState<TopicPopularTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -33,13 +34,13 @@ export function TopTagsChart({ period, videoType = 'all', onTagsLoaded, onTopicC
     setLoading(true);
     const fetchData = async () => {
       let result;
-      if (period === 'all' && videoType === 'all') {
+      if (period === 'all' && videoType === 'all' && country === null) {
         result = await supabase.from('topic_popular_tags').select('*')
           .order('topic_id').order('rank');
       } else {
         const minDate = getMinDate(period);
         result = await supabase.rpc('fn_topic_popular_tags', {
-          p_min_date: minDate, p_video_type: videoType,
+          p_min_date: minDate, p_video_type: videoType, p_country: country,
         });
       }
       if (cancelled) return;
@@ -50,7 +51,7 @@ export function TopTagsChart({ period, videoType = 'all', onTagsLoaded, onTopicC
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [period, videoType]);
+  }, [period, videoType, country]);
 
   if (loading) return null;
   if (data.length === 0) return null;

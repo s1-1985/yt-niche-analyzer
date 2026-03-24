@@ -47,14 +47,14 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedGenreId, setSelectedGenreId] = useState<string | null>(null);
 
-  const topics = useFilteredQuery<TopicSummary>('topic_summary', period, videoType);
-  const competition = useFilteredQuery<CompetitionConcentration>('competition_concentration', period, videoType);
-  const successRate = useFilteredQuery<NewChannelSuccessRate>('new_channel_success_rate', period, videoType);
-  const aiPen = useFilteredQuery<AiPenetration>('ai_penetration', period, videoType);
-  const duration = useFilteredQuery<TopicDurationStats>('topic_duration_stats', period, videoType);
-  const channelSize = useFilteredQuery<TopicChannelSize>('topic_channel_size', period, videoType);
-  const publishDay = useFilteredQuery<TopicPublishDay>('topic_publish_day', period, videoType);
-  const countryDist = useFilteredQuery<TopicCountryDistribution>('topic_country_distribution', period, videoType);
+  const topics = useFilteredQuery<TopicSummary>('topic_summary', period, videoType, selectedCountry);
+  const competition = useFilteredQuery<CompetitionConcentration>('competition_concentration', period, videoType, selectedCountry);
+  const successRate = useFilteredQuery<NewChannelSuccessRate>('new_channel_success_rate', period, videoType, selectedCountry);
+  const aiPen = useFilteredQuery<AiPenetration>('ai_penetration', period, videoType, selectedCountry);
+  const duration = useFilteredQuery<TopicDurationStats>('topic_duration_stats', period, videoType, selectedCountry);
+  const channelSize = useFilteredQuery<TopicChannelSize>('topic_channel_size', period, videoType, selectedCountry);
+  const publishDay = useFilteredQuery<TopicPublishDay>('topic_publish_day', period, videoType, selectedCountry);
+  const countryDist = useFilteredQuery<TopicCountryDistribution>('topic_country_distribution', period, videoType, selectedCountry);
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -293,7 +293,7 @@ function App() {
           {fPublishDay.length > 0 && (
             <section className="charts">
               <PublishDayChart data={fPublishDay} />
-              <ChannelGrowthChart period={period} videoType={videoType} onTopicClick={handleTopicClick} />
+              <ChannelGrowthChart period={period} videoType={videoType} country={selectedCountry} onTopicClick={handleTopicClick} />
             </section>
           )}
 
@@ -303,12 +303,12 @@ function App() {
           </div>
 
           <section className="charts">
-            <TopTagsChart period={period} videoType={videoType} onTagsLoaded={setTagsData} onTopicClick={handleTopicClick} />
+            <TopTagsChart period={period} videoType={videoType} country={selectedCountry} onTagsLoaded={setTagsData} onTopicClick={handleTopicClick} />
             {fCountryDist.length > 0 && <CountryChart data={fCountryDist} />}
           </section>
 
           <section className="charts-full">
-            <TopicOverlapChart period={period} videoType={videoType} onOverlapLoaded={setOverlapData} onTopicClick={handleTopicClick} />
+            <TopicOverlapChart period={period} videoType={videoType} country={selectedCountry} onOverlapLoaded={setOverlapData} onTopicClick={handleTopicClick} />
           </section>
 
           <section className="table-section">
