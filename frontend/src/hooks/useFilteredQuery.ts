@@ -73,13 +73,24 @@ export function useFilteredQuery<T>(
         if (cancelled) return;
 
         if (error) {
-          console.warn(`RPC fn_${view} failed, falling back to view:`, error.message);
-          const res = await supabase.from(view).select('*');
-          if (cancelled) return;
-          if (res.error) {
-            setState({ data: [], loading: false, error: res.error.message });
+          // videoType フィルタが指定されている場合はフォールバックしない
+          // （フィルタなしビューに戻すとフィルタが効かなくなるため）
+          if (videoType !== 'all') {
+            console.error(`RPC fn_${view} failed (videoType=${videoType}):`, error.message);
+            setState({
+              data: [],
+              loading: false,
+              error: `動画タイプフィルタの適用に失敗しました。SQLマイグレーション(migrate_add_video_type_filter.sql)の実行が必要です。`,
+            });
           } else {
-            setState({ data: (res.data as T[]) ?? [], loading: false, error: null });
+            console.warn(`RPC fn_${view} failed, falling back to view:`, error.message);
+            const res = await supabase.from(view).select('*');
+            if (cancelled) return;
+            if (res.error) {
+              setState({ data: [], loading: false, error: res.error.message });
+            } else {
+              setState({ data: (res.data as T[]) ?? [], loading: false, error: null });
+            }
           }
         } else {
           setState({ data: data ?? [], loading: false, error: null });
