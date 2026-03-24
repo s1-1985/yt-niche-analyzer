@@ -411,20 +411,20 @@ CREATE OR REPLACE FUNCTION cleanup_old_snapshots()
 RETURNS void AS $$
 BEGIN
     DELETE FROM video_snapshots
-    WHERE snapshot_date < CURRENT_DATE - INTERVAL '30 days'
+    WHERE snapshot_date < CURRENT_DATE - INTERVAL '365 days'
     AND id NOT IN (
         SELECT DISTINCT ON (video_id) id
         FROM video_snapshots
-        WHERE snapshot_date < CURRENT_DATE - INTERVAL '30 days'
+        WHERE snapshot_date < CURRENT_DATE - INTERVAL '365 days'
         ORDER BY video_id, snapshot_date DESC
     );
 
     DELETE FROM channel_snapshots
-    WHERE snapshot_date < CURRENT_DATE - INTERVAL '30 days'
+    WHERE snapshot_date < CURRENT_DATE - INTERVAL '365 days'
     AND id NOT IN (
         SELECT DISTINCT ON (channel_id) id
         FROM channel_snapshots
-        WHERE snapshot_date < CURRENT_DATE - INTERVAL '30 days'
+        WHERE snapshot_date < CURRENT_DATE - INTERVAL '365 days'
         ORDER BY channel_id, snapshot_date DESC
     );
 END;
