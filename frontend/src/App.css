@@ -1239,10 +1239,76 @@ tbody tr:hover {
   font-weight: 500;
 }
 
+.history-category {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .history-stat {
   color: var(--text-muted);
   font-size: 0.75rem;
   white-space: nowrap;
+}
+
+/* ====== Buzz Pickup ====== */
+.buzz-pickup {
+  margin-bottom: 24px;
+}
+
+.buzz-pickup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.buzz-period-selector {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.buzz-period-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.buzz-period-btn:hover {
+  color: var(--text);
+}
+
+.buzz-period-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.buzz-genre-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.buzz-genre-tag {
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(99, 102, 241, 0.3);
 }
 
 /* ====== Footer ====== */
@@ -1513,6 +1579,10 @@ tbody tr:hover {
   .history-item {
     gap: 8px;
     font-size: 0.75rem;
+  }
+
+  .buzz-pickup-header {
+    flex-direction: column;
   }
 
   .table-section {

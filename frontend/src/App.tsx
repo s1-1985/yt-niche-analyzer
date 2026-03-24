@@ -24,6 +24,7 @@ import { AiPromptCopyButton } from './components/AiPromptCopyButton';
 import { TopicTable } from './components/TopicTable';
 import { TopicDetail } from './components/TopicDetail';
 import { CollectionHistory } from './components/CollectionHistory';
+import { BuzzPickup } from './components/BuzzPickup';
 import type {
   TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
   TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
@@ -157,6 +158,10 @@ function App() {
               sub={bestSuccess ? `成功率: ${bestSuccess.success_rate_pct}%` : undefined}
               color="#10b981"
             />
+          </section>
+
+          <section className="charts-full">
+            <BuzzPickup />
           </section>
 
           <div className="section-divider">
