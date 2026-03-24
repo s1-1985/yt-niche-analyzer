@@ -16,6 +16,16 @@ interface Props {
   onTopicChange: (topicId: string | null) => void;
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  Entertainment: 'エンタメ',
+  Gaming: 'ゲーム',
+  Knowledge: '知識',
+  Lifestyle: 'ライフスタイル',
+  Music: '音楽',
+  Society: '社会',
+  Sports: 'スポーツ',
+};
+
 export function TopicFilter({ selectedCategory, selectedTopicId, onCategoryChange, onTopicChange }: Props) {
   const [topics, setTopics] = useState<Topic[]>([]);
 
@@ -36,54 +46,68 @@ export function TopicFilter({ selectedCategory, selectedTopicId, onCategoryChang
         .sort((a, b) => (a.name_ja ?? a.name).localeCompare(b.name_ja ?? b.name, 'ja'))
     : [];
 
-  const handleCategoryChange = (cat: string | null) => {
-    onCategoryChange(cat);
-    onTopicChange(null);
+  const handleCategoryChange = (value: string) => {
+    if (value === '') {
+      onCategoryChange(null);
+      onTopicChange(null);
+    } else {
+      onCategoryChange(value);
+      onTopicChange(null);
+    }
   };
+
+  const handleTopicChange = (value: string) => {
+    onTopicChange(value === '' ? null : value);
+  };
+
+  // Display label
+  const currentLabel = selectedTopicId
+    ? topics.find((t) => t.id === selectedTopicId)?.name_ja ?? topics.find((t) => t.id === selectedTopicId)?.name ?? ''
+    : selectedCategory
+      ? `${CATEGORY_LABELS[selectedCategory] ?? selectedCategory} 全体`
+      : '全ジャンル';
 
   return (
     <div className="topic-filter">
       <div className="topic-filter-row">
         <span className="topic-filter-label">ジャンル</span>
-        <div className="topic-filter-buttons">
-          <button
-            className={`topic-filter-btn ${!selectedCategory ? 'active' : ''}`}
-            onClick={() => handleCategoryChange(null)}
-          >
-            全体
-          </button>
+        <select
+          className="topic-filter-select"
+          value={selectedCategory ?? ''}
+          onChange={(e) => handleCategoryChange(e.target.value)}
+        >
+          <option value="">全ジャンル</option>
           {categories.map((cat) => (
-            <button
-              key={cat}
-              className={`topic-filter-btn ${selectedCategory === cat && !selectedTopicId ? 'active' : ''} ${selectedCategory === cat && selectedTopicId ? 'active-parent' : ''}`}
-              onClick={() => handleCategoryChange(cat === selectedCategory ? null : cat)}
-            >
-              {cat}
-            </button>
+            <option key={cat} value={cat}>{CATEGORY_LABELS[cat] ?? cat}</option>
           ))}
-        </div>
+        </select>
+
+        {selectedCategory && subTopics.length > 0 && (
+          <>
+            <span className="topic-filter-arrow">&rsaquo;</span>
+            <select
+              className="topic-filter-select"
+              value={selectedTopicId ?? ''}
+              onChange={(e) => handleTopicChange(e.target.value)}
+            >
+              <option value="">カテゴリ全体で比較</option>
+              {subTopics.map((t) => (
+                <option key={t.id} value={t.id}>{t.name_ja ?? t.name}</option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
-      {selectedCategory && subTopics.length > 0 && (
-        <div className="topic-filter-row sub">
-          <span className="topic-filter-label">サブジャンル</span>
-          <div className="topic-filter-buttons sub-buttons">
-            <button
-              className={`topic-filter-btn ${!selectedTopicId ? 'active' : ''}`}
-              onClick={() => onTopicChange(null)}
-            >
-              全サブ
-            </button>
-            {subTopics.map((t) => (
-              <button
-                key={t.id}
-                className={`topic-filter-btn ${selectedTopicId === t.id ? 'active' : ''}`}
-                onClick={() => onTopicChange(t.id === selectedTopicId ? null : t.id)}
-              >
-                {t.name_ja ?? t.name}
-              </button>
-            ))}
-          </div>
+      {(selectedCategory || selectedTopicId) && (
+        <div className="topic-filter-badge">
+          <span>{selectedTopicId ? '競合分析' : 'カテゴリ比較'}: {currentLabel}</span>
+          <button
+            className="topic-filter-clear"
+            onClick={() => { onCategoryChange(null); onTopicChange(null); }}
+          >
+            ✕ リセット
+          </button>
         </div>
       )}
     </div>

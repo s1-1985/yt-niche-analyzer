@@ -1608,19 +1608,15 @@ tbody tr:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .topic-filter-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
   justify-content: center;
-}
-
-.topic-filter-row.sub {
-  margin-top: 2px;
+  flex-wrap: wrap;
 }
 
 .topic-filter-label {
@@ -1629,46 +1625,56 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
-.topic-filter-buttons {
-  display: flex;
-  gap: 3px;
+.topic-filter-select {
   background: var(--surface);
   border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 6px 28px 6px 12px;
   border-radius: 8px;
-  padding: 3px;
-  flex-wrap: wrap;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  min-width: 140px;
 }
 
-.sub-buttons {
-  max-width: 700px;
+.topic-filter-select:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
-.topic-filter-btn {
-  background: transparent;
+.topic-filter-arrow {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+.topic-filter-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 6px;
+  padding: 3px 10px;
+}
+
+.topic-filter-clear {
+  background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.75rem;
-  padding: 5px 12px;
-  border-radius: 6px;
+  font-size: 0.65rem;
   cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 
-.topic-filter-btn:hover {
+.topic-filter-clear:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.topic-filter-btn.active {
-  background: var(--primary);
-  color: #fff;
-}
-
-.topic-filter-btn.active-parent {
-  background: rgba(99, 102, 241, 0.2);
-  color: var(--primary);
-  border: 1px solid var(--primary);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ====== DataStats Modal ====== */
@@ -1845,17 +1851,10 @@ tbody tr:hover {
 }
 
 @media (max-width: 640px) {
-  .topic-filter-buttons {
-    max-width: 100%;
-  }
-
-  .sub-buttons {
-    max-width: 100%;
-  }
-
-  .topic-filter-btn {
-    font-size: 0.7rem;
-    padding: 4px 8px;
+  .topic-filter-select {
+    min-width: 110px;
+    font-size: 0.75rem;
+    padding: 5px 24px 5px 8px;
   }
 
   .ca-tabs {
