@@ -1602,9 +1602,24 @@ tbody tr:hover {
   }
 }
 
+/* ====== Top Filter Row (Country + Genre) ====== */
+.top-filter-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.country-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ====== Topic Filter ====== */
 .topic-filter {
-  margin-top: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;

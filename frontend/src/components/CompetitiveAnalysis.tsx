@@ -5,6 +5,7 @@ import type { VideoRanking, ChannelRanking, ChannelGrowthEfficiency } from '../t
 interface Props {
   topicId: string;
   topicName: string;
+  selectedCountry?: string | null;
 }
 
 type Tab = 'buzz' | 'popular' | 'channels' | 'growth' | 'outlier';
@@ -27,7 +28,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 30)}ヶ月前`;
 }
 
-export function CompetitiveAnalysis({ topicId, topicName }: Props) {
+export function CompetitiveAnalysis({ topicId, topicName, selectedCountry }: Props) {
   const [videos, setVideos] = useState<VideoRanking[]>([]);
   const [channels, setChannels] = useState<ChannelRanking[]>([]);
   const [growth, setGrowth] = useState<ChannelGrowthEfficiency[]>([]);
@@ -76,25 +77,44 @@ export function CompetitiveAnalysis({ topicId, topicName }: Props) {
     return () => { cancelled = true; };
   }, [topicId]);
 
+  // Country filter: filter channels and videos by selected country
+  const filteredChannels = selectedCountry
+    ? channels.filter((ch) => ch.country === selectedCountry)
+    : channels;
+
+  const filteredChannelIds = selectedCountry
+    ? new Set(filteredChannels.map((ch) => ch.id))
+    : null;
+
+  const filteredVideos = filteredChannelIds
+    ? videos.filter((v) => filteredChannelIds.has(v.channel_id))
+    : videos;
+
+  const filteredGrowth = selectedCountry
+    ? growth.filter((g) => g.country === selectedCountry)
+    : growth;
+
   // Derived data
-  const buzzVideos = [...videos]
+  const buzzVideos = [...filteredVideos]
     .filter((v) => v.buzz_score > 0)
     .sort((a, b) => b.buzz_score - a.buzz_score)
     .slice(0, 20);
 
-  const popularVideos = [...videos]
+  const popularVideos = [...filteredVideos]
     .sort((a, b) => b.view_count - a.view_count)
     .slice(0, 20);
 
-  const topChannels = [...channels].slice(0, 20);
+  const topChannels = [...filteredChannels]
+    .sort((a, b) => b.subscriber_count - a.subscriber_count)
+    .slice(0, 20);
 
-  const growthChannels = [...growth]
+  const growthChannels = [...filteredGrowth]
     .filter((g) => g.age_days <= 365 && g.age_days > 0)
     .sort((a, b) => b.subs_per_day - a.subs_per_day)
     .slice(0, 20);
 
   // Outlier: low subscribers but high views per video
-  const outlierChannels = [...channels]
+  const outlierChannels = [...filteredChannels]
     .filter((ch) => ch.subscriber_count > 0 && ch.video_count > 0)
     .map((ch) => ({
       ...ch,
@@ -106,15 +126,15 @@ export function CompetitiveAnalysis({ topicId, topicName }: Props) {
     .slice(0, 20);
 
   // KPI
-  const totalVideos = videos.length;
-  const totalChannels = channels.length;
+  const totalVideos = filteredVideos.length;
+  const totalChannels = filteredChannels.length;
   const avgViews = totalVideos > 0
-    ? Math.round(videos.reduce((s, v) => s + v.view_count, 0) / totalVideos)
+    ? Math.round(filteredVideos.reduce((s, v) => s + v.view_count, 0) / totalVideos)
     : 0;
   const avgLikeRate = totalVideos > 0
-    ? (videos.reduce((s, v) => s + (v.view_count > 0 ? v.like_count / v.view_count * 100 : 0), 0) / totalVideos).toFixed(2)
+    ? (filteredVideos.reduce((s, v) => s + (v.view_count > 0 ? v.like_count / v.view_count * 100 : 0), 0) / totalVideos).toFixed(2)
     : '0';
-  const aiCount = videos.filter((v) => v.has_ai_keywords).length;
+  const aiCount = filteredVideos.filter((v) => v.has_ai_keywords).length;
   const aiPct = totalVideos > 0 ? Math.round(aiCount / totalVideos * 100) : 0;
 
   const tabs: { key: Tab; label: string; count: number }[] = [
