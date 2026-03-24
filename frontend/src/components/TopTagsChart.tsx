@@ -29,6 +29,7 @@ export function TopTagsChart({ period, videoType = 'all', onTagsLoaded, onTopicC
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     const fetchData = async () => {
       let result;
@@ -41,12 +42,14 @@ export function TopTagsChart({ period, videoType = 'all', onTagsLoaded, onTopicC
           p_min_date: minDate, p_video_type: videoType,
         });
       }
+      if (cancelled) return;
       const d = (result.data as TopicPopularTag[]) ?? [];
       setData(d);
       onTagsLoaded?.(d);
       setLoading(false);
     };
     fetchData();
+    return () => { cancelled = true; };
   }, [period, videoType]);
 
   if (loading) return null;

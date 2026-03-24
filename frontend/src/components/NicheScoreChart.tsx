@@ -41,20 +41,20 @@ export function NicheScoreChart({ topics, competition, successRate, aiPenetratio
   const aiMap = new Map(aiPenetration.map((a) => [a.topic_id, a.ai_penetration_pct]));
 
   const gapScores = subTopics.map((t) => t.gap_score);
-  const gapMin = Math.min(...gapScores);
-  const gapMax = Math.max(...gapScores);
+  const gapMin = gapScores.length > 0 ? Math.min(...gapScores) : 0;
+  const gapMax = gapScores.length > 0 ? Math.max(...gapScores) : 0;
 
   const compValues = subTopics.map((t) => compMap.get(t.topic_id) ?? 50);
-  const compMin = Math.min(...compValues);
-  const compMax = Math.max(...compValues);
+  const compMin = compValues.length > 0 ? Math.min(...compValues) : 0;
+  const compMax = compValues.length > 0 ? Math.max(...compValues) : 0;
 
   const successValues = subTopics.map((t) => successMap.get(t.topic_id) ?? 0);
-  const successMin = Math.min(...successValues);
-  const successMax = Math.max(...successValues);
+  const successMin = successValues.length > 0 ? Math.min(...successValues) : 0;
+  const successMax = successValues.length > 0 ? Math.max(...successValues) : 0;
 
   const aiValues = subTopics.map((t) => aiMap.get(t.topic_id) ?? 0);
-  const aiMin = Math.min(...aiValues);
-  const aiMax = Math.max(...aiValues);
+  const aiMin = aiValues.length > 0 ? Math.min(...aiValues) : 0;
+  const aiMax = aiValues.length > 0 ? Math.max(...aiValues) : 0;
 
   const scored: ChartEntry[] = subTopics.map((t) => {
     const gapNorm = normalize(t.gap_score, gapMin, gapMax);

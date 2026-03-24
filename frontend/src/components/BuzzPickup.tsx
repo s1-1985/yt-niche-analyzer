@@ -35,45 +35,40 @@ export function BuzzPickup() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.from('topics').select('id, name, name_ja').then((res) => {
-      if (cancelled) return;
-      if (res.error) return;
-      const map = new Map<string, string>();
-      if (res.data) {
-        for (const t of res.data as TopicName[]) {
-          map.set(t.id, t.name_ja ?? t.name);
-        }
-      }
-      setTopicMap(map);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
     setLoading(true);
     setError(null);
 
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    supabase
-      .from('video_ranking')
-      .select('*')
-      .gte('published_at', since.toISOString())
-      .gt('buzz_score', 0)
-      .order('buzz_score', { ascending: false })
-      .limit(20)
-      .then((res) => {
-        if (cancelled) return;
-        if (res.error) {
-          setError(res.error.message);
-          setLoading(false);
-          return;
+    Promise.all([
+      supabase.from('topics').select('id, name, name_ja'),
+      supabase
+        .from('video_ranking')
+        .select('*')
+        .gte('published_at', since.toISOString())
+        .gt('buzz_score', 0)
+        .order('buzz_score', { ascending: false })
+        .limit(20),
+    ]).then(([topicRes, videoRes]) => {
+      if (cancelled) return;
+
+      if (topicRes.data) {
+        const map = new Map<string, string>();
+        for (const t of topicRes.data as TopicName[]) {
+          map.set(t.id, t.name_ja ?? t.name);
         }
-        setVideos((res.data as VideoRanking[]) ?? []);
+        setTopicMap(map);
+      }
+
+      if (videoRes.error) {
+        setError(videoRes.error.message);
         setLoading(false);
-      });
+        return;
+      }
+      setVideos((videoRes.data as VideoRanking[]) ?? []);
+      setLoading(false);
+    });
 
     return () => { cancelled = true; };
   }, [days]);

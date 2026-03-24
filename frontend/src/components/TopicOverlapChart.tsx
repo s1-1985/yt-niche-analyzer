@@ -28,6 +28,7 @@ export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     const fetchData = async () => {
       let result;
@@ -40,6 +41,7 @@ export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, 
           p_min_date: minDate, p_video_type: videoType,
         });
       }
+      if (cancelled) return;
       const d = ((result.data as TopicOverlap[]) ?? [])
         .sort((a, b) => b.shared_channels - a.shared_channels).slice(0, 30);
       setData(d);
@@ -47,6 +49,7 @@ export function TopicOverlapChart({ period, videoType = 'all', onOverlapLoaded, 
       setLoading(false);
     };
     fetchData();
+    return () => { cancelled = true; };
   }, [period, videoType]);
 
   if (loading) return null;
