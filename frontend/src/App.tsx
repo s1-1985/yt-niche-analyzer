@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import { TimePeriodFilter } from './components/TimePeriodFilter';
 import { VideoTypeFilter } from './components/VideoTypeFilter';
 import { TopicFilter } from './components/TopicFilter';
+import { CountryFilter } from './components/CountryFilter';
 import { KpiCard } from './components/KpiCard';
 import { NicheScoreChart } from './components/NicheScoreChart';
 import { GapScoreChart } from './components/GapScoreChart';
@@ -38,6 +39,9 @@ import './App.css';
 function App() {
   const [period, setPeriod] = useState<TimePeriod>('all');
   const [videoType, setVideoType] = useState<VideoType>('all');
+
+  // Country filter state
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   // Genre filter state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -153,12 +157,15 @@ function App() {
             <button className="history-btn" onClick={() => setShowDataStats(true)}>データベース</button>
           </div>
         )}
-        <TopicFilter
-          selectedCategory={selectedCategory}
-          selectedTopicId={selectedGenreId}
-          onCategoryChange={setSelectedCategory}
-          onTopicChange={setSelectedGenreId}
-        />
+        <div className="top-filter-row">
+          <CountryFilter value={selectedCountry} onChange={setSelectedCountry} />
+          <TopicFilter
+            selectedCategory={selectedCategory}
+            selectedTopicId={selectedGenreId}
+            onCategoryChange={setSelectedCategory}
+            onTopicChange={setSelectedGenreId}
+          />
+        </div>
         {!isCompetitiveMode && (
           <div className="filter-row">
             <TimePeriodFilter value={period} onChange={setPeriod} />
@@ -189,7 +196,7 @@ function App() {
 
       {/* Competitive Analysis Mode */}
       {!isLoading && !hasError && isCompetitiveMode && (
-        <CompetitiveAnalysis topicId={selectedGenreId} topicName={selectedGenreName} />
+        <CompetitiveAnalysis topicId={selectedGenreId} topicName={selectedGenreName} selectedCountry={selectedCountry} />
       )}
 
       {/* Dashboard Mode (cross-genre comparison) */}
