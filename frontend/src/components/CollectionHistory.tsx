@@ -19,7 +19,7 @@ export function CollectionHistory({ onClose }: Props) {
   useEffect(() => {
     async function fetch() {
       const res = await supabase
-        .from('collection_logs')
+        .from('collection_log')
         .select('*')
         .order('collected_at', { ascending: false })
         .limit(100);

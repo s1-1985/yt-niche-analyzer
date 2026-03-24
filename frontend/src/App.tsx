@@ -54,7 +54,7 @@ function App() {
   // Last update time
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
-    supabase.from('collection_logs').select('collected_at')
+    supabase.from('collection_log').select('collected_at')
       .order('collected_at', { ascending: false }).limit(1)
       .then((res) => {
         const d = res.data as { collected_at: string }[] | null;
