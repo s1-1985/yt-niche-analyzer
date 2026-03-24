@@ -24,6 +24,35 @@ function getMinDate(period: TimePeriod): string | null {
   return now.toISOString();
 }
 
+const JP_REGEX = /[ぁ-んァ-ヶー一-龥々〆〤]/;
+
+function isJapaneseTag(tag: string): boolean {
+  return JP_REGEX.test(tag);
+}
+
+/** Re-rank tags within each topic: Japanese tags get 2x weight boost */
+function reRankWithJapanesePriority(tags: TopicPopularTag[]): TopicPopularTag[] {
+  const byTopic = new Map<string, TopicPopularTag[]>();
+  for (const t of tags) {
+    const list = byTopic.get(t.topic_id) ?? [];
+    list.push(t);
+    byTopic.set(t.topic_id, list);
+  }
+
+  const result: TopicPopularTag[] = [];
+  for (const [, topicTags] of byTopic) {
+    const sorted = [...topicTags].sort((a, b) => {
+      const aScore = a.usage_count * (isJapaneseTag(a.tag) ? 2 : 1);
+      const bScore = b.usage_count * (isJapaneseTag(b.tag) ? 2 : 1);
+      return bScore - aScore;
+    });
+    sorted.slice(0, 10).forEach((t, i) => {
+      result.push({ ...t, rank: i + 1 });
+    });
+  }
+  return result;
+}
+
 export function TopTagsChart({ period, videoType = 'all', country = null, onTagsLoaded, onTopicClick }: Props) {
   const [data, setData] = useState<TopicPopularTag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +73,9 @@ export function TopTagsChart({ period, videoType = 'all', country = null, onTags
         });
       }
       if (cancelled) return;
-      const d = (result.data as TopicPopularTag[]) ?? [];
+      const raw = (result.data as TopicPopularTag[]) ?? [];
+      // Re-rank with Japanese priority (client-side fallback for SQL migration)
+      const d = reRankWithJapanesePriority(raw);
       setData(d);
       onTagsLoaded?.(d);
       setLoading(false);
