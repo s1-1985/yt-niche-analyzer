@@ -10,6 +10,7 @@ interface Props {
   country?: string | null;
   onOverlapLoaded?: (data: TopicOverlap[]) => void;
   onTopicClick?: (topicId: string) => void;
+  onOverlapClick?: (topicA: string, topicB: string) => void;
 }
 
 function getMinDate(period: TimePeriod): string | null {
@@ -24,7 +25,7 @@ function getMinDate(period: TimePeriod): string | null {
   return now.toISOString();
 }
 
-export function TopicOverlapChart({ period, videoType = 'all', country = null, onOverlapLoaded, onTopicClick }: Props) {
+export function TopicOverlapChart({ period, videoType = 'all', country = null, onOverlapLoaded, onTopicClick, onOverlapClick }: Props) {
   const [data, setData] = useState<TopicOverlap[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -63,21 +64,28 @@ export function TopicOverlapChart({ period, videoType = 'all', country = null, o
         <HelpButton {...HELP_TEXTS.topicOverlap} />
       </div>
       <p className="chart-desc">
-        チャンネルが重複しているジャンルの組み合わせ。タップで対象ジャンルの詳細へ
+        チャンネルが重複しているジャンルの組み合わせ。組み合わせをタップで両ジャンルの動画を表示。個別ジャンル名をタップでそのジャンルの詳細へ
       </p>
       <div className="overlap-list-simple">
         {data.map((row, i) => (
           <div key={i} className="overlap-row">
             <span className="overlap-rank">#{i + 1}</span>
             <div className="overlap-names">
-              <button className="overlap-topic" onClick={() => onTopicClick?.(row.topic_a)}>
+              <button className="overlap-topic" onClick={(e) => { e.stopPropagation(); onTopicClick?.(row.topic_a); }}>
                 {row.name_a}
               </button>
               <span className="overlap-x">×</span>
-              <button className="overlap-topic" onClick={() => onTopicClick?.(row.topic_b)}>
+              <button className="overlap-topic" onClick={(e) => { e.stopPropagation(); onTopicClick?.(row.topic_b); }}>
                 {row.name_b}
               </button>
             </div>
+            <button
+              className="overlap-combo-btn"
+              onClick={() => onOverlapClick?.(row.topic_a, row.topic_b)}
+              title={`${row.name_a} × ${row.name_b} の動画を表示`}
+            >
+              両方
+            </button>
             <span className="overlap-ch">{row.shared_channels}ch</span>
           </div>
         ))}

@@ -57,6 +57,7 @@ function App() {
   const countryDist = useFilteredQuery<TopicCountryDistribution>('topic_country_distribution', period, videoType, selectedCountry);
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[] | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showDataStats, setShowDataStats] = useState(false);
 
@@ -126,10 +127,22 @@ function App() {
 
   const handleTopicClick = useCallback((topicId: string) => {
     setSelectedTopicId(topicId);
+    setSelectedTopicIds(null);
+  }, []);
+
+  const handleOverlapClick = useCallback((topicA: string, topicB: string) => {
+    setSelectedTopicId(topicA);
+    setSelectedTopicIds([topicA, topicB]);
   }, []);
 
   const selectedTopicName = selectedTopicId
     ? (() => {
+        if (selectedTopicIds && selectedTopicIds.length > 1) {
+          return selectedTopicIds.map((id) => {
+            const t = topics.data.find((t) => t.topic_id === id);
+            return t ? (t.name_ja ?? t.topic_name) : id;
+          }).join(' × ');
+        }
         const t = topics.data.find((t) => t.topic_id === selectedTopicId);
         return t ? (t.name_ja ?? t.topic_name) : selectedTopicId;
       })()
@@ -166,12 +179,10 @@ function App() {
             onTopicChange={setSelectedGenreId}
           />
         </div>
-        {!isCompetitiveMode && (
-          <div className="filter-row">
-            <TimePeriodFilter value={period} onChange={setPeriod} />
-            <VideoTypeFilter value={videoType} onChange={setVideoType} />
-          </div>
-        )}
+        <div className="filter-row">
+          {!isCompetitiveMode && <TimePeriodFilter value={period} onChange={setPeriod} />}
+          <VideoTypeFilter value={videoType} onChange={setVideoType} />
+        </div>
       </header>
 
       {isLoading && (
@@ -196,7 +207,7 @@ function App() {
 
       {/* Competitive Analysis Mode */}
       {!isLoading && !hasError && isCompetitiveMode && (
-        <CompetitiveAnalysis topicId={selectedGenreId} topicName={selectedGenreName} selectedCountry={selectedCountry} />
+        <CompetitiveAnalysis topicId={selectedGenreId} topicName={selectedGenreName} videoType={videoType} selectedCountry={selectedCountry} />
       )}
 
       {/* Dashboard Mode (cross-genre comparison) */}
@@ -228,7 +239,7 @@ function App() {
 
           {!selectedCategory && (
             <section className="charts-full">
-              <BuzzPickup />
+              <BuzzPickup videoType={videoType} />
             </section>
           )}
 
@@ -308,7 +319,7 @@ function App() {
           </section>
 
           <section className="charts-full">
-            <TopicOverlapChart period={period} videoType={videoType} country={selectedCountry} onOverlapLoaded={setOverlapData} onTopicClick={handleTopicClick} />
+            <TopicOverlapChart period={period} videoType={videoType} country={selectedCountry} onOverlapLoaded={setOverlapData} onTopicClick={handleTopicClick} onOverlapClick={handleOverlapClick} />
           </section>
 
           <section className="table-section">
@@ -328,8 +339,13 @@ function App() {
       )}
 
       {selectedTopicId && (
-        <TopicDetail topicId={selectedTopicId} topicName={selectedTopicName}
-          onClose={() => setSelectedTopicId(null)} />
+        <TopicDetail
+          topicId={selectedTopicId}
+          topicIds={selectedTopicIds ?? undefined}
+          topicName={selectedTopicName}
+          videoType={videoType}
+          onClose={() => { setSelectedTopicId(null); setSelectedTopicIds(null); }}
+        />
       )}
 
       {showHistory && <CollectionHistory onClose={() => setShowHistory(false)} />}

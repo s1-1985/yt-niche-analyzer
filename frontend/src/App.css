@@ -1131,6 +1131,22 @@ tbody tr:hover {
   font-weight: 600;
 }
 
+.overlap-combo-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+.overlap-combo-btn:hover {
+  opacity: 1;
+}
+
 /* ====== Category Selector ====== */
 .category-selector {
   display: flex;
