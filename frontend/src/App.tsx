@@ -34,6 +34,7 @@ import { CsvExportButton } from './components/CsvExportButton';
 import { CrossGenreScore } from './components/CrossGenreScore';
 import { SaturationChart } from './components/SaturationChart';
 import { SectionNav } from './components/SectionNav';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
 import type {
   TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
   TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
@@ -65,6 +66,7 @@ function App() {
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[] | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showDataStats, setShowDataStats] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const [tagsData, setTagsData] = useState<TopicPopularTag[]>([]);
   const [overlapData, setOverlapData] = useState<TopicOverlap[]>([]);
@@ -389,9 +391,15 @@ function App() {
 
       {showHistory && <CollectionHistory onClose={() => setShowHistory(false)} />}
       {showDataStats && <DataStats onClose={() => setShowDataStats(false)} />}
+      {showPrivacy && <PrivacyPolicy onClose={() => setShowPrivacy(false)} />}
 
       <footer className="footer" role="contentinfo">
-        <p>YouTube Data API v3 + Supabase | Auto-collected daily via GitHub Actions</p>
+        <p>YouTube Data API v3 + Supabase | Auto-collected daily via GitHub Actions
+          {' | '}
+          <a href="#" onClick={(e) => { e.preventDefault(); setShowPrivacy(true); }} style={{ color: '#6366f1' }}>
+            Privacy Policy
+          </a>
+        </p>
       </footer>
     </div>
   );
