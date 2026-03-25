@@ -32,7 +32,7 @@ function getWeekKey(date: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function TrendChart({ onTopicClick }: Props) {
+export function TrendChart(_props: Props) {
   const isMobile = useIsMobile();
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [topics, setTopics] = useState<TopicInfo[]>([]);
@@ -181,7 +181,7 @@ export function TrendChart({ onTopicClick }: Props) {
                   <strong>{label}</strong>
                   {payload.map((p) => (
                     <div key={p.dataKey as string} style={{ color: p.color }}>
-                      {topicNameMap.get(p.dataKey as string) ?? p.dataKey}: {p.value}本
+                      {topicNameMap.get(String(p.dataKey)) ?? String(p.dataKey)}: {String(p.value)}本
                     </div>
                   ))}
                 </div>
