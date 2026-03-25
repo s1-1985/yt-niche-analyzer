@@ -178,7 +178,7 @@ export function ChannelPatterns({ topicId, topicName }: Props) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="word" width={70} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => `${v}回`} />
+                <Tooltip formatter={(v) => `${v}回`} />
                 <Bar dataKey="count" fill="#6366f1" name="出現回数" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
