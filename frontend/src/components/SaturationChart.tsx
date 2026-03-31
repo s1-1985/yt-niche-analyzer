@@ -66,37 +66,61 @@ export function SaturationChart({ topics, aiPenetration, onTopicClick }: Props) 
     const threeMonthsAgo = now - 90 * 86400000;
     const sixMonthsAgo = now - 180 * 86400000;
 
+    // Determine data collection period to adjust calculations
+    const channelDates = channels
+      .filter((c) => c.published_at)
+      .map((c) => new Date(c.published_at).getTime());
+    const hasLongHistory = channelDates.some((ts) => ts <= threeMonthsAgo);
+
     const entries: SaturationEntry[] = subTopics.map((t) => {
       // Count channels in this topic for different periods
       const topicChannels = channels.filter((c) =>
         c.topic_ids?.includes(t.topic_id) && c.published_at,
       );
 
-      const recent3m = topicChannels.filter((c) =>
-        new Date(c.published_at).getTime() > threeMonthsAgo,
-      ).length;
-
-      const prev3m = topicChannels.filter((c) => {
-        const ts = new Date(c.published_at).getTime();
-        return ts > sixMonthsAgo && ts <= threeMonthsAgo;
-      }).length;
-
-      // Monthly growth rate
-      const recentMonthly = recent3m / 3;
-      const prevMonthly = prev3m / 3;
-      const growthRate = prevMonthly > 0
-        ? (recentMonthly - prevMonthly) / prevMonthly
-        : recentMonthly > 0 ? 1 : 0;
-
       const aiPct = aiMap.get(t.topic_id) ?? 0;
 
+      let growthRate: number;
+      let recentMonthly: number;
+
+      if (hasLongHistory) {
+        // Normal mode: compare recent 3 months vs previous 3 months
+        const recent3m = topicChannels.filter((c) =>
+          new Date(c.published_at).getTime() > threeMonthsAgo,
+        ).length;
+
+        const prev3m = topicChannels.filter((c) => {
+          const ts = new Date(c.published_at).getTime();
+          return ts > sixMonthsAgo && ts <= threeMonthsAgo;
+        }).length;
+
+        recentMonthly = recent3m / 3;
+        const prevMonthly = prev3m / 3;
+        growthRate = prevMonthly > 0
+          ? (recentMonthly - prevMonthly) / prevMonthly
+          : recentMonthly > 0 ? 1 : 0;
+      } else {
+        // Early stage: not enough history, estimate from channel age distribution
+        // Use ratio of new channels (< 1 year) to total as a proxy for growth
+        const newChannelCount = topicChannels.filter((c) => {
+          const age = now - new Date(c.published_at).getTime();
+          return age < 365 * 86400000;
+        }).length;
+
+        const totalCh = t.total_channels || 1;
+        // New channel ratio as growth proxy (higher ratio = more growth)
+        const newRatio = newChannelCount / totalCh;
+        // Scale: 50%+ new channels = high growth
+        growthRate = newRatio * 0.5;
+        recentMonthly = newChannelCount / 12;
+      }
+
       // Predict 6-month channel count
-      // current channels + projected new channels (monthly rate * 6, adjusted by growth)
       const projected = Math.round(
         t.total_channels + recentMonthly * 6 * (1 + growthRate * 0.5),
       );
 
-      // Saturation risk
+      // Saturation risk — use growth rate and AI penetration
       const growthPct = Math.round(growthRate * 100);
       let risk: 'low' | 'medium' | 'high' = 'low';
       if (growthPct > 30 || (growthPct > 15 && aiPct > 20)) {
