@@ -171,3 +171,27 @@ export interface TopicOverlap {
   name_b: string | null;
   shared_channels: number;
 }
+
+export interface KeywordOpportunity {
+  tag: string;
+  usage_count: number;
+  channel_count: number;
+  avg_views: number;
+  total_views: number;
+  avg_like_rate: number;
+  avg_buzz_score: number;
+  keyword_score: number;
+  rank: number;
+}
+
+export interface KeywordVirality {
+  tag: string;
+  video_count: number;
+  channel_count: number;
+  avg_views: number;
+  avg_buzz_score: number;
+  virality_score: number;
+  max_views: number;
+  viral_rate_pct: number;
+  rank: number;
+}

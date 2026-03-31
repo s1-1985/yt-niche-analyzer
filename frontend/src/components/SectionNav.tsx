@@ -12,6 +12,7 @@ const SECTIONS: Section[] = [
   { id: 'supply-demand', label: '需給分析' },
   { id: 'engagement', label: 'エンゲージ' },
   { id: 'strategy', label: '戦略' },
+  { id: 'keyword', label: 'キーワード' },
   { id: 'trend', label: 'トレンド' },
   { id: 'market', label: '市場構造' },
   { id: 'saturation', label: '飽和予測' },

@@ -35,6 +35,8 @@ import { CrossGenreScore } from './components/CrossGenreScore';
 import { SaturationChart } from './components/SaturationChart';
 import { SectionNav } from './components/SectionNav';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { KeywordOpportunityChart } from './components/KeywordOpportunityChart';
+import { KeywordViralityChart } from './components/KeywordViralityChart';
 import type {
   TopicSummary, CompetitionConcentration, NewChannelSuccessRate, AiPenetration,
   TopicDurationStats, TopicChannelSize, TopicPublishDay, TopicCountryDistribution,
@@ -324,6 +326,16 @@ function App() {
               <ChannelGrowthChart period={period} videoType={videoType} country={selectedCountry} onTopicClick={handleTopicClick} />
             </section>
           )}
+
+          <div className="section-divider" id="section-keyword">
+            <h2 className="section-title">キーワード分析</h2>
+            <p className="section-desc">お宝キーワードの発見と、おすすめに載りやすいキーワードの拡散力を分析</p>
+          </div>
+
+          <section className="charts" aria-label="キーワード分析">
+            <KeywordOpportunityChart period={period} videoType={videoType} country={selectedCountry} />
+            <KeywordViralityChart period={period} videoType={videoType} country={selectedCountry} />
+          </section>
 
           <div className="section-divider" id="section-trend">
             <h2 className="section-title">トレンド分析</h2>
