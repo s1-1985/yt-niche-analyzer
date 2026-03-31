@@ -2218,3 +2218,179 @@ tbody tr:hover {
     padding: 8px 12px;
   }
 }
+
+/* ====== Keyword Analysis ====== */
+.keyword-show-selector {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.keyword-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.keyword-list-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.keyword-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.keyword-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.kw-col-rank {
+  width: 36px;
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.kw-col-tag {
+  width: 140px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-tag-name {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.kw-col-score {
+  width: 80px;
+  flex-shrink: 0;
+  text-align: right;
+  font-weight: 600;
+  color: #c4b5fd;
+  font-variant-numeric: tabular-nums;
+}
+
+.kw-col-bar {
+  flex: 1;
+  min-width: 60px;
+  height: 8px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.kw-score-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #6366f1, #10b981);
+}
+
+.kw-score-bar.virality-bar {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+.kw-col-views {
+  width: 80px;
+  flex-shrink: 0;
+  text-align: right;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.kw-col-comp {
+  width: 56px;
+  flex-shrink: 0;
+  text-align: right;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.kw-col-buzz {
+  width: 56px;
+  flex-shrink: 0;
+  text-align: right;
+  color: #fbbf24;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.kw-col-label {
+  width: 64px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.kw-ds-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Keyword responsive */
+@media (max-width: 768px) {
+  .keyword-list-header {
+    display: none;
+  }
+
+  .keyword-item {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  }
+
+  .kw-col-rank {
+    width: 30px;
+    font-size: 0.75rem;
+  }
+
+  .kw-col-tag {
+    width: calc(100% - 110px);
+    font-size: 0.85rem;
+  }
+
+  .kw-col-score {
+    width: 70px;
+    font-size: 0.8rem;
+  }
+
+  .kw-col-bar {
+    width: 100%;
+    order: 10;
+    min-width: unset;
+  }
+
+  .kw-col-views,
+  .kw-col-comp,
+  .kw-col-buzz {
+    width: auto;
+    font-size: 0.72rem;
+  }
+
+  .kw-col-label {
+    width: auto;
+  }
+}
