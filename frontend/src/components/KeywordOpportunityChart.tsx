@@ -62,7 +62,17 @@ export function KeywordOpportunityChart({ period, videoType = 'all', country = n
   }, [period, videoType, country]);
 
   if (loading) return <div className="chart-card"><div className="loading"><div className="spinner" /><p>読み込み中...</p></div></div>;
-  if (data.length === 0) return null;
+  if (data.length === 0) {
+    return (
+      <div className="chart-card keyword-opportunity">
+        <div className="chart-title-row">
+          <h3>お宝キーワード発見</h3>
+          <HelpButton {...HELP_TEXTS.keywordOpportunity} />
+        </div>
+        <p className="empty-msg">キーワードデータがまだありません。SQL migration (migrate_keyword_analysis.sql) の実行が必要です。</p>
+      </div>
+    );
+  }
 
   const maxScore = data[0]?.keyword_score ?? 1;
   const visible = data.slice(0, showCount);

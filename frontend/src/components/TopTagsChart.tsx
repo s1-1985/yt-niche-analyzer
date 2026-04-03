@@ -85,7 +85,20 @@ export function TopTagsChart({ period, videoType = 'all', country = null, onTags
   }, [period, videoType, country]);
 
   if (loading) return null;
-  if (data.length === 0) return null;
+  if (data.length === 0) {
+    return (
+      <div className="chart-card">
+        <div className="chart-title-row">
+          <h3>人気タグ TOP10</h3>
+          <HelpButton {...HELP_TEXTS.topTags} />
+        </div>
+        <p className="chart-desc">
+          ジャンル別の頻出タグ。動画投稿時にどんなタグをつけるべきかの参考に
+        </p>
+        <p className="empty-msg">タグデータがまだありません。データ収集が進むと表示されます。</p>
+      </div>
+    );
+  }
 
   const topicMap = new Map<string, string>();
   for (const row of data) {
