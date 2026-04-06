@@ -38,17 +38,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_latest_channel_snapshot_cid
 
 -- 4. マテリアライズドビューのリフレッシュ関数
 CREATE OR REPLACE FUNCTION refresh_latest_snapshots()
-RETURNS void AS $$
+RETURNS void AS $fn$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_video_snapshot;
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_channel_snapshot;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 5. ビュー再定義（マテリアライズドビュー使用で高速化）
+-- 既存ビューをDROPしてから再作成（カラム変更に対応）
 
--- topic_summary: DISTINCT ON → mv_latest_video_snapshot
-CREATE OR REPLACE VIEW topic_summary AS
+DROP VIEW IF EXISTS topic_summary CASCADE;
+CREATE VIEW topic_summary AS
 SELECT
     t.id AS topic_id,
     t.name AS topic_name,
@@ -76,8 +77,8 @@ JOIN videos v ON t.id = ANY(v.topic_ids)
 JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
 GROUP BY t.id, t.name, t.name_ja, t.parent_id, t.category;
 
--- competition_concentration: MAX subquery → mv_latest_video_snapshot
-CREATE OR REPLACE VIEW competition_concentration AS
+DROP VIEW IF EXISTS competition_concentration CASCADE;
+CREATE VIEW competition_concentration AS
 WITH channel_views AS (
     SELECT
         t.id AS topic_id,
@@ -105,8 +106,8 @@ GROUP BY topic_id, topic_name, name_ja, topic_total_views;
 
 -- ai_penetration: 変更なし（元々軽い）
 
--- new_channel_success_rate: DISTINCT ON → mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW new_channel_success_rate AS
+DROP VIEW IF EXISTS new_channel_success_rate CASCADE;
+CREATE VIEW new_channel_success_rate AS
 WITH new_channels AS (
     SELECT c.id, c.topic_ids, cs.subscriber_count, c.published_at
     FROM channels c
@@ -124,8 +125,8 @@ FROM topics t
 JOIN new_channels nc ON t.id = ANY(nc.topic_ids)
 GROUP BY t.id, t.name, t.name_ja;
 
--- video_ranking: DISTINCT ON → mv_latest_video_snapshot + mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW video_ranking AS
+DROP VIEW IF EXISTS video_ranking CASCADE;
+CREATE VIEW video_ranking AS
 SELECT
     v.id,
     v.title,
@@ -149,8 +150,8 @@ JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
 LEFT JOIN channels c ON v.channel_id = c.id
 LEFT JOIN mv_latest_channel_snapshot cs ON v.channel_id = cs.channel_id;
 
--- channel_ranking: DISTINCT ON → mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW channel_ranking AS
+DROP VIEW IF EXISTS channel_ranking CASCADE;
+CREATE VIEW channel_ranking AS
 SELECT
     c.id,
     c.title,
@@ -163,8 +164,8 @@ SELECT
 FROM channels c
 JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id;
 
--- outlier_channels: DISTINCT ON → mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW outlier_channels AS
+DROP VIEW IF EXISTS outlier_channels CASCADE;
+CREATE VIEW outlier_channels AS
 WITH channel_with_ratio AS (
     SELECT
         c.id, c.title, c.published_at, c.topic_ids,
@@ -180,6 +181,111 @@ WITH channel_with_ratio AS (
 SELECT *, PERCENT_RANK() OVER (ORDER BY views_to_sub_ratio) AS percentile
 FROM channel_with_ratio;
 
+-- topic_popular_tags: DISTINCT ON → mv_latest_video_snapshot
+DROP VIEW IF EXISTS topic_popular_tags CASCADE;
+CREATE VIEW topic_popular_tags AS
+WITH tag_data AS (
+    SELECT
+        t.id AS topic_id,
+        t.name AS topic_name,
+        t.name_ja,
+        LOWER(TRIM(tag)) AS tag,
+        vs.view_count
+    FROM topics t
+    JOIN videos v ON t.id = ANY(v.topic_ids)
+    CROSS JOIN UNNEST(v.tags) AS tag
+    JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+    WHERE v.tags IS NOT NULL
+      AND ARRAY_LENGTH(v.tags, 1) > 0
+),
+ranked AS (
+    SELECT
+        topic_id, topic_name, name_ja, tag,
+        COUNT(*) AS usage_count,
+        COALESCE(AVG(view_count), 0)::BIGINT AS avg_views,
+        ROW_NUMBER() OVER (
+            PARTITION BY topic_id
+            ORDER BY COUNT(*) * CASE WHEN tag ~ '[ぁ-んァ-ヶー一-龥々〆〤]' THEN 2 ELSE 1 END DESC
+        ) AS rank
+    FROM tag_data
+    WHERE LENGTH(tag) >= 2
+    GROUP BY topic_id, topic_name, name_ja, tag
+)
+SELECT topic_id, topic_name, name_ja, tag, usage_count, avg_views, rank
+FROM ranked WHERE rank <= 10;
+
+-- topic_publish_day: DISTINCT ON → mv_latest_video_snapshot
+DROP VIEW IF EXISTS topic_publish_day CASCADE;
+CREATE VIEW topic_publish_day AS
+SELECT
+    t.id AS topic_id, t.name AS topic_name, t.name_ja, t.parent_id,
+    EXTRACT(DOW FROM v.published_at AT TIME ZONE 'Asia/Tokyo')::INTEGER AS dow,
+    COUNT(*) AS video_count,
+    COALESCE(AVG(vs.view_count), 0)::BIGINT AS avg_views,
+    COALESCE(SUM(vs.view_count), 0)::BIGINT AS total_views
+FROM topics t
+JOIN videos v ON t.id = ANY(v.topic_ids)
+JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+GROUP BY t.id, t.name, t.name_ja, t.parent_id,
+    EXTRACT(DOW FROM v.published_at AT TIME ZONE 'Asia/Tokyo');
+
+-- topic_country_distribution: DISTINCT ON → mv_latest_channel_snapshot
+DROP VIEW IF EXISTS topic_country_distribution CASCADE;
+CREATE VIEW topic_country_distribution AS
+SELECT
+    t.id AS topic_id, t.name AS topic_name, t.name_ja, t.parent_id,
+    COALESCE(c.country, 'Unknown') AS country,
+    COUNT(DISTINCT c.id) AS channel_count,
+    COALESCE(SUM(cs.subscriber_count), 0)::BIGINT AS total_subscribers
+FROM topics t
+JOIN channels c ON t.id = ANY(c.topic_ids)
+JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+GROUP BY t.id, t.name, t.name_ja, t.parent_id, COALESCE(c.country, 'Unknown');
+
+-- topic_channel_size: DISTINCT ON → mv_latest_channel_snapshot
+DROP VIEW IF EXISTS topic_channel_size CASCADE;
+CREATE VIEW topic_channel_size AS
+WITH topic_channels AS (
+    SELECT
+        t.id AS topic_id, t.name AS topic_name, t.name_ja, t.parent_id,
+        c.id AS channel_id, cs.subscriber_count
+    FROM topics t
+    JOIN channels c ON t.id = ANY(c.topic_ids)
+    JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+)
+SELECT
+    topic_id, topic_name, name_ja, parent_id,
+    COUNT(DISTINCT channel_id) AS total_channels,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count < 1000) AS small_count,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 1000 AND subscriber_count < 10000) AS medium_count,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 10000 AND subscriber_count < 100000) AS large_count,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 100000) AS mega_count,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count < 1000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS small_pct,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 1000 AND subscriber_count < 10000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS medium_pct,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 10000 AND subscriber_count < 100000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS large_pct,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 100000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS mega_pct
+FROM topic_channels
+GROUP BY topic_id, topic_name, name_ja, parent_id;
+
+-- channel_growth_efficiency: DISTINCT ON → mv_latest_channel_snapshot
+DROP VIEW IF EXISTS channel_growth_efficiency CASCADE;
+CREATE VIEW channel_growth_efficiency AS
+SELECT
+    c.id AS channel_id, c.title, c.published_at, c.country, c.topic_ids,
+    cs.subscriber_count, cs.view_count, cs.video_count,
+    GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1)::INTEGER AS age_days,
+    CASE WHEN EXTRACT(EPOCH FROM (NOW() - c.published_at)) > 0
+        THEN ROUND(cs.subscriber_count::NUMERIC / GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1), 2)
+        ELSE 0
+    END AS subs_per_day,
+    CASE WHEN cs.video_count > 0
+        THEN ROUND(cs.view_count::NUMERIC / cs.video_count)
+        ELSE 0
+    END AS views_per_video
+FROM channels c
+JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+WHERE c.published_at IS NOT NULL AND cs.subscriber_count > 0;
+
 -- 6. RPC関数も最適化（マテリアライズドビュー使用）
 
 -- fn_topic_summary
@@ -193,7 +299,7 @@ RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT, parent_id TEXT, category TEXT,
     total_videos BIGINT, total_channels BIGINT, total_views NUMERIC,
     avg_views BIGINT, gap_score BIGINT, like_rate_pct NUMERIC, comment_rate_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     SELECT t.id, t.name, t.name_ja, t.parent_id, t.category,
@@ -217,7 +323,7 @@ BEGIN
       AND (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja, t.parent_id, t.category;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_competition_concentration
 DROP FUNCTION IF EXISTS fn_competition_concentration(TIMESTAMPTZ, TEXT, TEXT);
@@ -229,7 +335,7 @@ CREATE OR REPLACE FUNCTION fn_competition_concentration(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     topic_total_views BIGINT, top5_views BIGINT, top5_share_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH channel_views AS (
@@ -257,7 +363,7 @@ BEGIN
     FROM ranked r
     GROUP BY r.tid, r.tname, r.tname_ja, r.topic_total;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_ai_penetration
 DROP FUNCTION IF EXISTS fn_ai_penetration(TIMESTAMPTZ, TEXT, TEXT);
@@ -269,7 +375,7 @@ CREATE OR REPLACE FUNCTION fn_ai_penetration(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     total_videos BIGINT, ai_video_count BIGINT, ai_penetration_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     SELECT t.id, t.name, t.name_ja,
@@ -286,7 +392,7 @@ BEGIN
       AND (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_new_channel_success_rate
 DROP FUNCTION IF EXISTS fn_new_channel_success_rate(TIMESTAMPTZ, TEXT, TEXT);
@@ -298,7 +404,7 @@ CREATE OR REPLACE FUNCTION fn_new_channel_success_rate(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     new_channel_count BIGINT, successful_count BIGINT, success_rate_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH active_channels AS (
@@ -325,7 +431,7 @@ BEGIN
     JOIN new_channels nc ON t.id = ANY(nc.ctopic_ids)
     GROUP BY t.id, t.name, t.name_ja;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_duration_stats
 DROP FUNCTION IF EXISTS fn_topic_duration_stats(TIMESTAMPTZ, TEXT, TEXT);
@@ -339,7 +445,7 @@ RETURNS TABLE(
     video_count BIGINT, avg_duration INTEGER, median_duration INTEGER,
     p25_duration INTEGER, p75_duration INTEGER,
     short_count BIGINT, medium_count BIGINT, long_count BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH topic_videos AS (
@@ -366,7 +472,7 @@ BEGIN
     FROM topic_videos tv
     GROUP BY tv.tid, tv.tname, tv.tname_ja, tv.tparent;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_channel_size
 DROP FUNCTION IF EXISTS fn_topic_channel_size(TIMESTAMPTZ, TEXT, TEXT);
@@ -380,7 +486,7 @@ RETURNS TABLE(
     total_channels BIGINT, small_count BIGINT, medium_count BIGINT,
     large_count BIGINT, mega_count BIGINT,
     small_pct NUMERIC, medium_pct NUMERIC, large_pct NUMERIC, mega_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH active_channels AS (
@@ -412,7 +518,7 @@ BEGIN
     FROM topic_channels tc
     GROUP BY tc.tid, tc.tname, tc.tname_ja, tc.tparent;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_publish_day
 DROP FUNCTION IF EXISTS fn_topic_publish_day(TIMESTAMPTZ, TEXT, TEXT);
@@ -424,7 +530,7 @@ CREATE OR REPLACE FUNCTION fn_topic_publish_day(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT, parent_id TEXT,
     dow INTEGER, video_count BIGINT, avg_views BIGINT, total_views BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     SELECT t.id, t.name, t.name_ja, t.parent_id,
@@ -441,7 +547,7 @@ BEGIN
       AND (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja, t.parent_id, vdow;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_country_distribution
 DROP FUNCTION IF EXISTS fn_topic_country_distribution(TIMESTAMPTZ, TEXT, TEXT);
@@ -453,7 +559,7 @@ CREATE OR REPLACE FUNCTION fn_topic_country_distribution(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT, parent_id TEXT,
     country TEXT, channel_count BIGINT, total_subscribers BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH active_channels AS (
@@ -473,7 +579,7 @@ BEGIN
     WHERE (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja, t.parent_id, COALESCE(c.country, 'Unknown');
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_popular_tags
 DROP FUNCTION IF EXISTS fn_topic_popular_tags(TIMESTAMPTZ, TEXT, TEXT);
@@ -485,7 +591,7 @@ CREATE OR REPLACE FUNCTION fn_topic_popular_tags(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     tag TEXT, usage_count BIGINT, avg_views BIGINT, rank BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH tag_data AS (
@@ -517,7 +623,7 @@ BEGIN
         ranked.vtag, ranked.cnt, ranked.avgv, ranked.rn
     FROM ranked WHERE rn <= 20;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- 7. 初回リフレッシュ実行
 SELECT refresh_latest_snapshots();
