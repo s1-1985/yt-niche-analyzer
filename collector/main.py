@@ -13,7 +13,7 @@ import os
 import sys
 
 from youtube_client import YouTubeClient, QuotaExceededError
-from supabase_client import init_client, upsert_channels, upsert_videos, cleanup_old_snapshots
+from supabase_client import init_client, upsert_channels, upsert_videos, cleanup_old_snapshots, refresh_materialized_views
 from rotation import get_today_topics, log_collection, DAILY_QUOTA_LIMIT, QUOTA_PER_TOPIC
 from metrics import compute_collection_stats
 from topic_ids import TOPIC_IDS
@@ -126,6 +126,9 @@ def main():
 
     # 7. 古いスナップショット削除（容量管理）
     cleanup_old_snapshots(sb)
+
+    # 8. マテリアライズドビュー更新（クエリ高速化）
+    refresh_materialized_views(sb)
 
     logger.info(
         f"Collection complete. "

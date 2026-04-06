@@ -59,7 +59,17 @@ export function KeywordViralityChart({ period, videoType = 'all', country = null
   }, [period, videoType, country]);
 
   if (loading) return <div className="chart-card"><div className="loading"><div className="spinner" /><p>読み込み中...</p></div></div>;
-  if (data.length === 0) return null;
+  if (data.length === 0) {
+    return (
+      <div className="chart-card keyword-virality">
+        <div className="chart-title-row">
+          <h3>キーワード拡散ランキング</h3>
+          <HelpButton {...HELP_TEXTS.keywordVirality} />
+        </div>
+        <p className="empty-msg">キーワードデータがまだありません。SQL migration (migrate_keyword_analysis.sql) の実行が必要です。</p>
+      </div>
+    );
+  }
 
   const maxVirality = data[0]?.virality_score ?? 1;
   const visible = data.slice(0, showCount);
