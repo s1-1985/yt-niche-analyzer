@@ -38,12 +38,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_latest_channel_snapshot_cid
 
 -- 4. マテリアライズドビューのリフレッシュ関数
 CREATE OR REPLACE FUNCTION refresh_latest_snapshots()
-RETURNS void AS $$
+RETURNS void AS $fn$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_video_snapshot;
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_channel_snapshot;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 5. ビュー再定義（マテリアライズドビュー使用で高速化）
 -- 既存ビューをDROPしてから再作成（カラム変更に対応）
@@ -299,7 +299,7 @@ RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT, parent_id TEXT, category TEXT,
     total_videos BIGINT, total_channels BIGINT, total_views NUMERIC,
     avg_views BIGINT, gap_score BIGINT, like_rate_pct NUMERIC, comment_rate_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     SELECT t.id, t.name, t.name_ja, t.parent_id, t.category,
@@ -323,7 +323,7 @@ BEGIN
       AND (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja, t.parent_id, t.category;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_competition_concentration
 DROP FUNCTION IF EXISTS fn_competition_concentration(TIMESTAMPTZ, TEXT, TEXT);
@@ -335,7 +335,7 @@ CREATE OR REPLACE FUNCTION fn_competition_concentration(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     topic_total_views BIGINT, top5_views BIGINT, top5_share_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH channel_views AS (
@@ -363,7 +363,7 @@ BEGIN
     FROM ranked r
     GROUP BY r.tid, r.tname, r.tname_ja, r.topic_total;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_ai_penetration
 DROP FUNCTION IF EXISTS fn_ai_penetration(TIMESTAMPTZ, TEXT, TEXT);
@@ -375,7 +375,7 @@ CREATE OR REPLACE FUNCTION fn_ai_penetration(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     total_videos BIGINT, ai_video_count BIGINT, ai_penetration_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     SELECT t.id, t.name, t.name_ja,
@@ -392,7 +392,7 @@ BEGIN
       AND (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_new_channel_success_rate
 DROP FUNCTION IF EXISTS fn_new_channel_success_rate(TIMESTAMPTZ, TEXT, TEXT);
@@ -404,7 +404,7 @@ CREATE OR REPLACE FUNCTION fn_new_channel_success_rate(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     new_channel_count BIGINT, successful_count BIGINT, success_rate_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH active_channels AS (
@@ -431,7 +431,7 @@ BEGIN
     JOIN new_channels nc ON t.id = ANY(nc.ctopic_ids)
     GROUP BY t.id, t.name, t.name_ja;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_duration_stats
 DROP FUNCTION IF EXISTS fn_topic_duration_stats(TIMESTAMPTZ, TEXT, TEXT);
@@ -445,7 +445,7 @@ RETURNS TABLE(
     video_count BIGINT, avg_duration INTEGER, median_duration INTEGER,
     p25_duration INTEGER, p75_duration INTEGER,
     short_count BIGINT, medium_count BIGINT, long_count BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH topic_videos AS (
@@ -472,7 +472,7 @@ BEGIN
     FROM topic_videos tv
     GROUP BY tv.tid, tv.tname, tv.tname_ja, tv.tparent;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_channel_size
 DROP FUNCTION IF EXISTS fn_topic_channel_size(TIMESTAMPTZ, TEXT, TEXT);
@@ -486,7 +486,7 @@ RETURNS TABLE(
     total_channels BIGINT, small_count BIGINT, medium_count BIGINT,
     large_count BIGINT, mega_count BIGINT,
     small_pct NUMERIC, medium_pct NUMERIC, large_pct NUMERIC, mega_pct NUMERIC
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH active_channels AS (
@@ -518,7 +518,7 @@ BEGIN
     FROM topic_channels tc
     GROUP BY tc.tid, tc.tname, tc.tname_ja, tc.tparent;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_publish_day
 DROP FUNCTION IF EXISTS fn_topic_publish_day(TIMESTAMPTZ, TEXT, TEXT);
@@ -530,7 +530,7 @@ CREATE OR REPLACE FUNCTION fn_topic_publish_day(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT, parent_id TEXT,
     dow INTEGER, video_count BIGINT, avg_views BIGINT, total_views BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     SELECT t.id, t.name, t.name_ja, t.parent_id,
@@ -547,7 +547,7 @@ BEGIN
       AND (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja, t.parent_id, vdow;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_country_distribution
 DROP FUNCTION IF EXISTS fn_topic_country_distribution(TIMESTAMPTZ, TEXT, TEXT);
@@ -559,7 +559,7 @@ CREATE OR REPLACE FUNCTION fn_topic_country_distribution(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT, parent_id TEXT,
     country TEXT, channel_count BIGINT, total_subscribers BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH active_channels AS (
@@ -579,7 +579,7 @@ BEGIN
     WHERE (p_country IS NULL OR c.country = p_country)
     GROUP BY t.id, t.name, t.name_ja, t.parent_id, COALESCE(c.country, 'Unknown');
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- fn_topic_popular_tags
 DROP FUNCTION IF EXISTS fn_topic_popular_tags(TIMESTAMPTZ, TEXT, TEXT);
@@ -591,7 +591,7 @@ CREATE OR REPLACE FUNCTION fn_topic_popular_tags(
 RETURNS TABLE(
     topic_id TEXT, topic_name TEXT, name_ja TEXT,
     tag TEXT, usage_count BIGINT, avg_views BIGINT, rank BIGINT
-) AS $$
+) AS $fn$
 BEGIN
     RETURN QUERY
     WITH tag_data AS (
@@ -623,7 +623,7 @@ BEGIN
         ranked.vtag, ranked.cnt, ranked.avgv, ranked.rn
     FROM ranked WHERE rn <= 20;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$fn$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- 7. 初回リフレッシュ実行
 SELECT refresh_latest_snapshots();
