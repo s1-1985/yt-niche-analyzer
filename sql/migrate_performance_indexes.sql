@@ -46,9 +46,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 5. ビュー再定義（マテリアライズドビュー使用で高速化）
+-- 既存ビューをDROPしてから再作成（カラム変更に対応）
 
--- topic_summary: DISTINCT ON → mv_latest_video_snapshot
-CREATE OR REPLACE VIEW topic_summary AS
+DROP VIEW IF EXISTS topic_summary CASCADE;
+CREATE VIEW topic_summary AS
 SELECT
     t.id AS topic_id,
     t.name AS topic_name,
@@ -76,8 +77,8 @@ JOIN videos v ON t.id = ANY(v.topic_ids)
 JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
 GROUP BY t.id, t.name, t.name_ja, t.parent_id, t.category;
 
--- competition_concentration: MAX subquery → mv_latest_video_snapshot
-CREATE OR REPLACE VIEW competition_concentration AS
+DROP VIEW IF EXISTS competition_concentration CASCADE;
+CREATE VIEW competition_concentration AS
 WITH channel_views AS (
     SELECT
         t.id AS topic_id,
@@ -105,8 +106,8 @@ GROUP BY topic_id, topic_name, name_ja, topic_total_views;
 
 -- ai_penetration: 変更なし（元々軽い）
 
--- new_channel_success_rate: DISTINCT ON → mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW new_channel_success_rate AS
+DROP VIEW IF EXISTS new_channel_success_rate CASCADE;
+CREATE VIEW new_channel_success_rate AS
 WITH new_channels AS (
     SELECT c.id, c.topic_ids, cs.subscriber_count, c.published_at
     FROM channels c
@@ -124,8 +125,8 @@ FROM topics t
 JOIN new_channels nc ON t.id = ANY(nc.topic_ids)
 GROUP BY t.id, t.name, t.name_ja;
 
--- video_ranking: DISTINCT ON → mv_latest_video_snapshot + mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW video_ranking AS
+DROP VIEW IF EXISTS video_ranking CASCADE;
+CREATE VIEW video_ranking AS
 SELECT
     v.id,
     v.title,
@@ -149,8 +150,8 @@ JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
 LEFT JOIN channels c ON v.channel_id = c.id
 LEFT JOIN mv_latest_channel_snapshot cs ON v.channel_id = cs.channel_id;
 
--- channel_ranking: DISTINCT ON → mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW channel_ranking AS
+DROP VIEW IF EXISTS channel_ranking CASCADE;
+CREATE VIEW channel_ranking AS
 SELECT
     c.id,
     c.title,
@@ -163,8 +164,8 @@ SELECT
 FROM channels c
 JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id;
 
--- outlier_channels: DISTINCT ON → mv_latest_channel_snapshot
-CREATE OR REPLACE VIEW outlier_channels AS
+DROP VIEW IF EXISTS outlier_channels CASCADE;
+CREATE VIEW outlier_channels AS
 WITH channel_with_ratio AS (
     SELECT
         c.id, c.title, c.published_at, c.topic_ids,
@@ -179,6 +180,111 @@ WITH channel_with_ratio AS (
 )
 SELECT *, PERCENT_RANK() OVER (ORDER BY views_to_sub_ratio) AS percentile
 FROM channel_with_ratio;
+
+-- topic_popular_tags: DISTINCT ON → mv_latest_video_snapshot
+DROP VIEW IF EXISTS topic_popular_tags CASCADE;
+CREATE VIEW topic_popular_tags AS
+WITH tag_data AS (
+    SELECT
+        t.id AS topic_id,
+        t.name AS topic_name,
+        t.name_ja,
+        LOWER(TRIM(tag)) AS tag,
+        vs.view_count
+    FROM topics t
+    JOIN videos v ON t.id = ANY(v.topic_ids)
+    CROSS JOIN UNNEST(v.tags) AS tag
+    JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+    WHERE v.tags IS NOT NULL
+      AND ARRAY_LENGTH(v.tags, 1) > 0
+),
+ranked AS (
+    SELECT
+        topic_id, topic_name, name_ja, tag,
+        COUNT(*) AS usage_count,
+        COALESCE(AVG(view_count), 0)::BIGINT AS avg_views,
+        ROW_NUMBER() OVER (
+            PARTITION BY topic_id
+            ORDER BY COUNT(*) * CASE WHEN tag ~ '[ぁ-んァ-ヶー一-龥々〆〤]' THEN 2 ELSE 1 END DESC
+        ) AS rank
+    FROM tag_data
+    WHERE LENGTH(tag) >= 2
+    GROUP BY topic_id, topic_name, name_ja, tag
+)
+SELECT topic_id, topic_name, name_ja, tag, usage_count, avg_views, rank
+FROM ranked WHERE rank <= 10;
+
+-- topic_publish_day: DISTINCT ON → mv_latest_video_snapshot
+DROP VIEW IF EXISTS topic_publish_day CASCADE;
+CREATE VIEW topic_publish_day AS
+SELECT
+    t.id AS topic_id, t.name AS topic_name, t.name_ja, t.parent_id,
+    EXTRACT(DOW FROM v.published_at AT TIME ZONE 'Asia/Tokyo')::INTEGER AS dow,
+    COUNT(*) AS video_count,
+    COALESCE(AVG(vs.view_count), 0)::BIGINT AS avg_views,
+    COALESCE(SUM(vs.view_count), 0)::BIGINT AS total_views
+FROM topics t
+JOIN videos v ON t.id = ANY(v.topic_ids)
+JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+GROUP BY t.id, t.name, t.name_ja, t.parent_id,
+    EXTRACT(DOW FROM v.published_at AT TIME ZONE 'Asia/Tokyo');
+
+-- topic_country_distribution: DISTINCT ON → mv_latest_channel_snapshot
+DROP VIEW IF EXISTS topic_country_distribution CASCADE;
+CREATE VIEW topic_country_distribution AS
+SELECT
+    t.id AS topic_id, t.name AS topic_name, t.name_ja, t.parent_id,
+    COALESCE(c.country, 'Unknown') AS country,
+    COUNT(DISTINCT c.id) AS channel_count,
+    COALESCE(SUM(cs.subscriber_count), 0)::BIGINT AS total_subscribers
+FROM topics t
+JOIN channels c ON t.id = ANY(c.topic_ids)
+JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+GROUP BY t.id, t.name, t.name_ja, t.parent_id, COALESCE(c.country, 'Unknown');
+
+-- topic_channel_size: DISTINCT ON → mv_latest_channel_snapshot
+DROP VIEW IF EXISTS topic_channel_size CASCADE;
+CREATE VIEW topic_channel_size AS
+WITH topic_channels AS (
+    SELECT
+        t.id AS topic_id, t.name AS topic_name, t.name_ja, t.parent_id,
+        c.id AS channel_id, cs.subscriber_count
+    FROM topics t
+    JOIN channels c ON t.id = ANY(c.topic_ids)
+    JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+)
+SELECT
+    topic_id, topic_name, name_ja, parent_id,
+    COUNT(DISTINCT channel_id) AS total_channels,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count < 1000) AS small_count,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 1000 AND subscriber_count < 10000) AS medium_count,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 10000 AND subscriber_count < 100000) AS large_count,
+    COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 100000) AS mega_count,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count < 1000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS small_pct,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 1000 AND subscriber_count < 10000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS medium_pct,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 10000 AND subscriber_count < 100000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS large_pct,
+    ROUND(COUNT(DISTINCT channel_id) FILTER (WHERE subscriber_count >= 100000)::NUMERIC / NULLIF(COUNT(DISTINCT channel_id), 0) * 100, 1) AS mega_pct
+FROM topic_channels
+GROUP BY topic_id, topic_name, name_ja, parent_id;
+
+-- channel_growth_efficiency: DISTINCT ON → mv_latest_channel_snapshot
+DROP VIEW IF EXISTS channel_growth_efficiency CASCADE;
+CREATE VIEW channel_growth_efficiency AS
+SELECT
+    c.id AS channel_id, c.title, c.published_at, c.country, c.topic_ids,
+    cs.subscriber_count, cs.view_count, cs.video_count,
+    GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1)::INTEGER AS age_days,
+    CASE WHEN EXTRACT(EPOCH FROM (NOW() - c.published_at)) > 0
+        THEN ROUND(cs.subscriber_count::NUMERIC / GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1), 2)
+        ELSE 0
+    END AS subs_per_day,
+    CASE WHEN cs.video_count > 0
+        THEN ROUND(cs.view_count::NUMERIC / cs.video_count)
+        ELSE 0
+    END AS views_per_video
+FROM channels c
+JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+WHERE c.published_at IS NOT NULL AND cs.subscriber_count > 0;
 
 -- 6. RPC関数も最適化（マテリアライズドビュー使用）
 
