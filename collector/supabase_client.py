@@ -128,3 +128,15 @@ def cleanup_old_snapshots(client: Client):
             "cleanup_old_snapshots RPC not found. "
             "Please add the cleanup function to setup.sql"
         )
+
+
+def refresh_materialized_views(client: Client):
+    """マテリアライズドビューをリフレッシュ（クエリ高速化）"""
+    try:
+        client.rpc("refresh_latest_snapshots", {}).execute()
+        logger.info("Materialized views refreshed")
+    except Exception:
+        logger.warning(
+            "refresh_latest_snapshots RPC not found. "
+            "Run migrate_performance_indexes.sql to create it."
+        )
