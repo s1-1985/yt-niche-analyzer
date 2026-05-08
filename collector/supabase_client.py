@@ -142,9 +142,12 @@ def refresh_materialized_views(client: Client):
     Group 3: analytics MVs (keyword, ai_penetration, topic_overlap, etc.)
     """
     groups = [
-        ("refresh_snapshot_base", "Group1: snapshot base"),
-        ("refresh_derived_mvs",   "Group2: derived MVs"),
-        ("refresh_analytics_mvs", "Group3: analytics MVs"),
+        ("refresh_snapshot_base",    "Group1: snapshot base"),
+        ("refresh_derived_mvs",      "Group2: derived MVs"),
+        ("refresh_analytics_mvs",    "Group3: analytics MVs"),
+        ("refresh_type_base_mvs",    "Group4: type base MVs"),
+        ("refresh_type_overlap_mvs", "Group5: type overlap MVs"),
+        ("refresh_type_keyword_mvs", "Group6: type keyword MVs"),
     ]
     for rpc_name, label in groups:
         try:
