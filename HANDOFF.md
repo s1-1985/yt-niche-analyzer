@@ -31,6 +31,8 @@
 | 13 | BuzzPickup ✅ / fn_keyword ✅ / topic_overlap ✅ 確認 | ✅ |
 | 14 | fn_ai_penetration / fn_topic_duration_stats タイムアウト原因特定 | ✅ JOIN videos ON t.id = ANY(topic_ids) がGIN未使用 |
 | 15 | `sql/migrate_fix_topic_views.sql` 作成（mv_video_topics + 2MV） | ✅ **Success. No rows returned** |
+| 16 | PR #46 マージ（500エラー完全修正 + MV更新分割） | ✅ マージ済み |
+| 17 | `sql/migrate_split_refresh_functions.sql` Supabase実行 | ✅ **Success. No rows returned** |
 
 ---
 
@@ -345,6 +347,11 @@ REFRESH MATERIALIZED VIEW mv_video_tags;  -- 追加予定
 ---
 
 ## 次のセッションでやること（優先順）
+
+### ✅ 全作業完了（2026-05-08）
+- 全チャートのタイムアウト・500エラー解消
+- MV更新を3グループ分割で将来のスケーラビリティ対応済み
+- 翌日のGitHub Actions（08:00 UTC）でMVリフレッシュが正常動作するか確認するのみ
 
 ### ✅ 全MV・全インデックス適用完了（2026-05-08）
 - 全16MV確認済み
