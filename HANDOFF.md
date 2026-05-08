@@ -24,21 +24,23 @@
 | 6 | ①〜④実行後もBUZZ/keyword系3件timeout残存を確認 | ✅ 確認 |
 | 7 | `sql/migrate_mv_video_ranking_and_tags.sql` 作成・プッシュ | ✅ fdd9bbe |
 | 8 | 上記SQLをユーザーに提示（次のセッションで実行待ち） | ✅ 提示済み・**未実行** |
+| 9 | Supabase pg_matviews で全16MV存在確認（英語名・正常） | ✅ **全MV適用済み確認** |
+| 10 | インデックス4本の存在確認SQL提示（ユーザー実行待ち） | ⏳ 確認中 |
 
 ---
 
 ## ダッシュボードの現状（2026-05-08 時点）
 
-### 発生中の500エラー（全て statement timeout）
-| エラー | 原因 | 修正状況 |
+### MV適用状況（pg_matviews で全16MV確認済み ✅）
+| エラー | 修正内容 | 適用状況 |
 |---|---|---|
-| `video_ranking` timeout（BUZZ動画ランキング） | `videos.published_at` インデックスなし | ❌ 未適用 |
-| `ai_penetration` timeout | `videos.topic_ids` GINインデックスなし | ❌ 未適用 |
-| `topic_duration_stats` timeout | 同上 | ❌ 未適用 |
-| `topic_overlap` timeout | `channels.topic_ids` GINインデックスなし | ❌ 未適用 |
-| `channels` saturation timeout | `channels.published_at` インデックスなし | ❌ 未適用 |
-| `fn_keyword_virality` timeout | インデックスなし + CROSS JOIN UNNEST 86k行 | ❌ 未適用 |
-| `fn_keyword_opportunity` timeout | 同上 | ❌ 未適用 |
+| `video_ranking` timeout（BUZZ動画ランキング） | `mv_video_ranking` MV化 | ✅ MV存在確認済み |
+| `ai_penetration` timeout | `idx_videos_topic_ids` GIN | ⏳ インデックス確認中 |
+| `topic_duration_stats` timeout | `idx_videos_topic_ids` GIN | ⏳ インデックス確認中 |
+| `topic_overlap` timeout | `idx_channels_topic_ids` GIN | ⏳ インデックス確認中 |
+| `channels` saturation timeout | `idx_channels_published_at` | ⏳ インデックス確認中 |
+| `fn_keyword_virality` timeout | `mv_video_tags` + `mv_keyword_virality` | ✅ MV存在確認済み |
+| `fn_keyword_opportunity` timeout | `mv_video_tags` + `mv_keyword_opportunity` | ✅ MV存在確認済み |
 
 ### 根本原因
 データが **86k動画 / 46kチャンネル** に増加。以下のインデックスがないため全行スキャンで 8秒 timeout に達する：
@@ -51,15 +53,27 @@
 
 ## Supabase 適用状況
 
-### 実行済み ✅
-- `mv_latest_video_snapshot` 作成
-- `mv_latest_channel_snapshot` 作成
+### 実行済み ✅（pg_matviews で全16MV確認 2026-05-08）
+- `mv_latest_video_snapshot` ✅
+- `mv_latest_channel_snapshot` ✅
+- `mv_channel_growth_efficiency` ✅
+- `mv_video_tags` ✅
+- `mv_video_ranking` ✅
+- `mv_keyword_opportunity` ✅
+- `mv_keyword_virality` ✅
+- `mv_topic_summary`, `mv_topic_channel_size`, `mv_topic_popular_tags` 等 ✅
 - 全ビュー・RPC関数のMV参照化（migrate_performance_indexes.sql）
-- `fn_keyword_virality` 再作成
-- `fn_keyword_opportunity` 再作成
-- `channel_growth_efficiency` → 前セッションで MV 化を試みたが未確認
 
-### 未実行 ❌（← 次のセッションで最初にやること）
+### 要確認（インデックス4本）
+以下のSQLで存在確認：
+```sql
+SELECT indexname, tablename FROM pg_indexes 
+WHERE indexname IN ('idx_videos_published_at','idx_channels_published_at','idx_videos_topic_ids','idx_channels_topic_ids')
+ORDER BY indexname;
+```
+4行返れば全OK。不足があれば以下で追加：
+
+### 未実行 ❌（インデックスが不足している場合のみ）
 以下のSQLを Supabase SQL Editor に **全部まとめて** コピペして Run する：
 
 ```sql
@@ -480,5 +494,12 @@ END;
 $fn$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-### 2. Run 後にダッシュボードをリロードして確認
-### 3. 全チャートOKになったら HANDOFF.md を更新してセッション完了
+### 2. インデックス確認SQLを実行（4行返ってくればOK）
+```sql
+SELECT indexname, tablename FROM pg_indexes 
+WHERE indexname IN ('idx_videos_published_at','idx_channels_published_at','idx_videos_topic_ids','idx_channels_topic_ids')
+ORDER BY indexname;
+```
+### 3. 結果をClaude Codeに報告 → 不足分のインデックスがあれば追加SQL提示
+### 4. ダッシュボードをリロードして全チャートOK確認
+### 5. 全チャートOKになったら HANDOFF.md を更新してセッション完了
