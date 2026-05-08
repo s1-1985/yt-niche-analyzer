@@ -131,12 +131,24 @@ def cleanup_old_snapshots(client: Client):
 
 
 def refresh_materialized_views(client: Client):
-    """マテリアライズドビューをリフレッシュ（クエリ高速化）"""
-    try:
-        client.rpc("refresh_latest_snapshots", {}).execute()
-        logger.info("Materialized views refreshed")
-    except Exception:
-        logger.warning(
-            "refresh_latest_snapshots RPC not found. "
-            "Run migrate_performance_indexes.sql to create it."
-        )
+    """マテリアライズドビューをリフレッシュ（クエリ高速化）
+
+    3グループに分割して順番に呼び出す。
+    Supabase Free プランの8秒タイムアウト対策として、
+    各グループが独立したRPCコール（独立したタイムアウト枠）になる。
+
+    Group 1: snapshot base (mv_latest_video/channel_snapshot)
+    Group 2: derived MVs (video_tags, video_topics, video_ranking, etc.)
+    Group 3: analytics MVs (keyword, ai_penetration, topic_overlap, etc.)
+    """
+    groups = [
+        ("refresh_snapshot_base", "Group1: snapshot base"),
+        ("refresh_derived_mvs",   "Group2: derived MVs"),
+        ("refresh_analytics_mvs", "Group3: analytics MVs"),
+    ]
+    for rpc_name, label in groups:
+        try:
+            client.rpc(rpc_name, {}).execute()
+            logger.info(f"Materialized views refreshed: {label}")
+        except Exception as e:
+            logger.warning(f"refresh failed [{label}]: {e}")
