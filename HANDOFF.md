@@ -31,6 +31,8 @@
 | 13 | BuzzPickup ✅ / fn_keyword ✅ / topic_overlap ✅ 確認 | ✅ |
 | 14 | fn_ai_penetration / fn_topic_duration_stats タイムアウト原因特定 | ✅ JOIN videos ON t.id = ANY(topic_ids) がGIN未使用 |
 | 15 | `sql/migrate_fix_topic_views.sql` 作成（mv_video_topics + 2MV） | ✅ **Success. No rows returned** |
+| 16 | PR #46 マージ（500エラー完全修正 + MV更新分割） | ✅ マージ済み |
+| 17 | `sql/migrate_split_refresh_functions.sql` Supabase実行 | ⏳ 未実行 |
 
 ---
 
