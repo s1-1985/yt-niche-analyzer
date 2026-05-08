@@ -126,7 +126,7 @@ WITH ts AS (
            COALESCE(SUM(vs.view_count), 0)::BIGINT AS total_views,
            COALESCE(AVG(CASE WHEN vs.view_count > 0
                THEN vs.like_count::NUMERIC / vs.view_count * 100
-               ELSE 0 END), 0)::NUMERIC(5,2)  AS avg_like_rate,
+               ELSE 0 END), 0)::NUMERIC(8,2)  AS avg_like_rate,
            COALESCE(AVG(CASE WHEN cs.subscriber_count > 0
                THEN vs.view_count::NUMERIC / cs.subscriber_count
                ELSE 0 END), 0)::NUMERIC(10,1) AS avg_buzz_score
@@ -159,7 +159,7 @@ WITH ts AS (
            COALESCE(SUM(vs.view_count), 0)::BIGINT AS total_views,
            COALESCE(AVG(CASE WHEN vs.view_count > 0
                THEN vs.like_count::NUMERIC / vs.view_count * 100
-               ELSE 0 END), 0)::NUMERIC(5,2)  AS avg_like_rate,
+               ELSE 0 END), 0)::NUMERIC(8,2)  AS avg_like_rate,
            COALESCE(AVG(CASE WHEN cs.subscriber_count > 0
                THEN vs.view_count::NUMERIC / cs.subscriber_count
                ELSE 0 END), 0)::NUMERIC(10,1) AS avg_buzz_score
@@ -1066,7 +1066,7 @@ BEGIN
                COALESCE(SUM(vs.view_count), 0)::BIGINT AS total_views,
                COALESCE(AVG(CASE WHEN vs.view_count > 0
                    THEN vs.like_count::NUMERIC / vs.view_count * 100
-                   ELSE 0 END), 0)::NUMERIC(5,2)  AS avg_like_rate,
+                   ELSE 0 END), 0)::NUMERIC(8,2)  AS avg_like_rate,
                COALESCE(AVG(CASE WHEN cs.subscriber_count > 0
                    THEN vs.view_count::NUMERIC / cs.subscriber_count
                    ELSE 0 END), 0)::NUMERIC(10,1) AS avg_buzz_score
