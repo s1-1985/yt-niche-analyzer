@@ -221,6 +221,170 @@ GROUP BY topic_id, topic_name, name_ja, parent_id;
 
 CREATE UNIQUE INDEX idx_mv_topic_duration_stats_tid ON mv_topic_duration_stats(topic_id);
 
+-- mv_video_ranking（Buzz動画ピックアップ用: buzz_score事前計算 + published_atインデックス）
+DROP MATERIALIZED VIEW IF EXISTS mv_video_ranking CASCADE;
+CREATE MATERIALIZED VIEW mv_video_ranking AS
+SELECT
+    v.id,
+    v.title,
+    v.channel_id,
+    c.title AS channel_title,
+    v.published_at,
+    v.duration_seconds,
+    v.topic_ids,
+    v.has_ai_keywords,
+    v.thumbnail_url,
+    vs.view_count,
+    vs.like_count,
+    vs.comment_count,
+    cs.subscriber_count AS channel_subscribers,
+    CASE WHEN cs.subscriber_count > 0
+        THEN ROUND(vs.view_count::NUMERIC / cs.subscriber_count, 1)
+        ELSE 0
+    END AS buzz_score
+FROM videos v
+JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+LEFT JOIN channels c ON v.channel_id = c.id
+LEFT JOIN mv_latest_channel_snapshot cs ON v.channel_id = cs.channel_id;
+
+CREATE UNIQUE INDEX idx_mv_video_ranking_id ON mv_video_ranking(id);
+CREATE INDEX idx_mv_video_ranking_pub_buzz ON mv_video_ranking(published_at DESC, buzz_score DESC);
+
+-- mv_channel_growth_efficiency（チャンネル成長効率: subs_per_day事前計算）
+DROP MATERIALIZED VIEW IF EXISTS mv_channel_growth_efficiency CASCADE;
+CREATE MATERIALIZED VIEW mv_channel_growth_efficiency AS
+SELECT
+    c.id AS channel_id, c.title, c.published_at, c.country, c.topic_ids,
+    cs.subscriber_count, cs.view_count, cs.video_count,
+    GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1)::INTEGER AS age_days,
+    CASE WHEN EXTRACT(EPOCH FROM (NOW() - c.published_at)) > 0
+        THEN ROUND(cs.subscriber_count::NUMERIC / GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1), 2)
+        ELSE 0
+    END AS subs_per_day,
+    CASE WHEN cs.video_count > 0
+        THEN ROUND(cs.view_count::NUMERIC / cs.video_count)
+        ELSE 0
+    END AS views_per_video
+FROM channels c
+JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+WHERE c.published_at IS NOT NULL AND cs.subscriber_count > 0;
+
+CREATE UNIQUE INDEX idx_mv_channel_growth_cid ON mv_channel_growth_efficiency(channel_id);
+CREATE INDEX idx_mv_channel_growth_spd ON mv_channel_growth_efficiency(subs_per_day DESC);
+
+-- mv_outlier_channels（外れ値チャンネル: PERCENT_RANK事前計算）
+DROP MATERIALIZED VIEW IF EXISTS mv_outlier_channels CASCADE;
+CREATE MATERIALIZED VIEW mv_outlier_channels AS
+WITH channel_with_ratio AS (
+    SELECT
+        c.id, c.title, c.published_at, c.topic_ids,
+        cs.subscriber_count, cs.view_count,
+        CASE WHEN cs.subscriber_count > 0
+            THEN (cs.view_count::NUMERIC / cs.subscriber_count)
+            ELSE 0
+        END AS views_to_sub_ratio
+    FROM channels c
+    JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+    WHERE cs.subscriber_count > 0
+)
+SELECT *, PERCENT_RANK() OVER (ORDER BY views_to_sub_ratio) AS percentile
+FROM channel_with_ratio;
+
+CREATE UNIQUE INDEX idx_mv_outlier_channels_id ON mv_outlier_channels(id);
+
+-- mv_keyword_opportunity（お宝キーワード: mv_latest_*使用で高速化）
+DROP MATERIALIZED VIEW IF EXISTS mv_keyword_opportunity CASCADE;
+CREATE MATERIALIZED VIEW mv_keyword_opportunity AS
+WITH tag_stats AS (
+    SELECT
+        LOWER(TRIM(tag)) AS tag,
+        COUNT(*) AS usage_count,
+        COUNT(DISTINCT v.channel_id) AS channel_count,
+        COALESCE(AVG(vs.view_count), 0)::BIGINT AS avg_views,
+        COALESCE(SUM(vs.view_count), 0)::BIGINT AS total_views,
+        COALESCE(AVG(
+            CASE WHEN vs.view_count > 0
+            THEN (vs.like_count::NUMERIC / vs.view_count * 100)
+            ELSE 0 END
+        ), 0)::NUMERIC(5,2) AS avg_like_rate,
+        COALESCE(AVG(
+            CASE WHEN cs.subscriber_count > 0
+            THEN vs.view_count::NUMERIC / cs.subscriber_count
+            ELSE 0 END
+        ), 0)::NUMERIC(10,1) AS avg_buzz_score
+    FROM videos v
+    CROSS JOIN UNNEST(v.tags) AS tag
+    JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+    LEFT JOIN mv_latest_channel_snapshot cs ON v.channel_id = cs.channel_id
+    WHERE v.tags IS NOT NULL AND ARRAY_LENGTH(v.tags, 1) > 0
+    GROUP BY LOWER(TRIM(tag))
+    HAVING COUNT(*) >= 2 AND LENGTH(LOWER(TRIM(tag))) >= 2
+),
+scored AS (
+    SELECT *,
+        ROUND(
+            (avg_views::NUMERIC / GREATEST(channel_count, 1))
+            * (1 + avg_like_rate / 10)
+            * LEAST(avg_buzz_score / 10 + 1, 5)
+        )::BIGINT AS keyword_score
+    FROM tag_stats
+)
+SELECT
+    tag, usage_count, channel_count, avg_views, total_views,
+    avg_like_rate, avg_buzz_score, keyword_score,
+    ROW_NUMBER() OVER (ORDER BY keyword_score DESC) AS rank
+FROM scored
+ORDER BY keyword_score DESC
+LIMIT 200;
+
+CREATE UNIQUE INDEX idx_mv_keyword_opportunity_tag ON mv_keyword_opportunity(tag);
+
+-- mv_keyword_virality（キーワード拡散: mv_latest_*使用で高速化）
+DROP MATERIALIZED VIEW IF EXISTS mv_keyword_virality CASCADE;
+CREATE MATERIALIZED VIEW mv_keyword_virality AS
+WITH tag_buzz AS (
+    SELECT
+        LOWER(TRIM(tag)) AS tag,
+        COUNT(*) AS video_count,
+        COUNT(DISTINCT v.channel_id) AS channel_count,
+        COALESCE(AVG(vs.view_count), 0)::BIGINT AS avg_views,
+        COALESCE(AVG(
+            CASE WHEN cs.subscriber_count > 0
+            THEN vs.view_count::NUMERIC / cs.subscriber_count
+            ELSE 0 END
+        ), 0)::NUMERIC(10,1) AS avg_buzz_score,
+        COALESCE(AVG(
+            CASE WHEN cs.subscriber_count > 0 AND vs.view_count > 0
+            THEN (vs.view_count::NUMERIC / cs.subscriber_count)
+                 * (1 + vs.like_count::NUMERIC / vs.view_count * 5)
+                 * (1 + vs.comment_count::NUMERIC / vs.view_count * 10)
+            ELSE 0 END
+        ), 0)::NUMERIC(10,1) AS virality_score,
+        MAX(vs.view_count) AS max_views,
+        ROUND(
+            COUNT(*) FILTER (WHERE cs.subscriber_count > 0
+                AND vs.view_count::NUMERIC / cs.subscriber_count > 2)
+            * 100.0 / GREATEST(COUNT(*), 1),
+            1
+        )::NUMERIC(5,1) AS viral_rate_pct
+    FROM videos v
+    CROSS JOIN UNNEST(v.tags) AS tag
+    JOIN mv_latest_video_snapshot vs ON v.id = vs.video_id
+    LEFT JOIN mv_latest_channel_snapshot cs ON v.channel_id = cs.channel_id
+    WHERE v.tags IS NOT NULL AND ARRAY_LENGTH(v.tags, 1) > 0
+    GROUP BY LOWER(TRIM(tag))
+    HAVING COUNT(*) >= 3 AND LENGTH(LOWER(TRIM(tag))) >= 2
+)
+SELECT
+    tag, video_count, channel_count, avg_views, avg_buzz_score,
+    virality_score, max_views, viral_rate_pct,
+    ROW_NUMBER() OVER (ORDER BY virality_score DESC) AS rank
+FROM tag_buzz
+ORDER BY virality_score DESC
+LIMIT 100;
+
+CREATE UNIQUE INDEX idx_mv_keyword_virality_tag ON mv_keyword_virality(tag);
+
 -- ============================================================
 -- 3. 静的ビューをMV参照に書き換え（SELECT * FROM mv_xxx のみ）
 -- ============================================================
@@ -246,6 +410,21 @@ CREATE VIEW topic_country_distribution AS SELECT * FROM mv_topic_country_distrib
 DROP VIEW IF EXISTS topic_channel_size CASCADE;
 CREATE VIEW topic_channel_size AS SELECT * FROM mv_topic_channel_size;
 
+DROP VIEW IF EXISTS video_ranking CASCADE;
+CREATE VIEW video_ranking AS SELECT * FROM mv_video_ranking;
+
+DROP VIEW IF EXISTS channel_growth_efficiency CASCADE;
+CREATE VIEW channel_growth_efficiency AS SELECT * FROM mv_channel_growth_efficiency;
+
+DROP VIEW IF EXISTS outlier_channels CASCADE;
+CREATE VIEW outlier_channels AS SELECT * FROM mv_outlier_channels;
+
+DROP VIEW IF EXISTS keyword_opportunity CASCADE;
+CREATE VIEW keyword_opportunity AS SELECT * FROM mv_keyword_opportunity;
+
+DROP VIEW IF EXISTS keyword_virality CASCADE;
+CREATE VIEW keyword_virality AS SELECT * FROM mv_keyword_virality;
+
 -- ============================================================
 -- 4. refresh関数を全MV対応に更新
 -- ============================================================
@@ -256,7 +435,7 @@ BEGIN
     -- スナップショットMV（他のMVが依存するため先にリフレッシュ）
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_video_snapshot;
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_channel_snapshot;
-    -- 集計MV（スナップショットMVに依存）
+    -- 集計MV
     REFRESH MATERIALIZED VIEW mv_topic_summary;
     REFRESH MATERIALIZED VIEW mv_competition_concentration;
     REFRESH MATERIALIZED VIEW mv_new_channel_success_rate;
@@ -265,6 +444,12 @@ BEGIN
     REFRESH MATERIALIZED VIEW mv_topic_country_distribution;
     REFRESH MATERIALIZED VIEW mv_topic_channel_size;
     REFRESH MATERIALIZED VIEW mv_topic_duration_stats;
+    -- ランキング・分析MV
+    REFRESH MATERIALIZED VIEW mv_video_ranking;
+    REFRESH MATERIALIZED VIEW mv_channel_growth_efficiency;
+    REFRESH MATERIALIZED VIEW mv_outlier_channels;
+    REFRESH MATERIALIZED VIEW mv_keyword_opportunity;
+    REFRESH MATERIALIZED VIEW mv_keyword_virality;
 END;
 $fn$ LANGUAGE plpgsql SECURITY DEFINER;
 
