@@ -25,7 +25,7 @@
 | 7 | `sql/migrate_mv_video_ranking_and_tags.sql` 作成・プッシュ | ✅ fdd9bbe |
 | 8 | 上記SQLをユーザーに提示（次のセッションで実行待ち） | ✅ 提示済み・**未実行** |
 | 9 | Supabase pg_matviews で全16MV存在確認（英語名・正常） | ✅ **全MV適用済み確認** |
-| 10 | インデックス4本の存在確認SQL提示（ユーザー実行待ち） | ⏳ 確認中 |
+| 10 | インデックス4本の存在確認SQL提示（ユーザー実行待ち） | ✅ **全4本確認済み** |
 
 ---
 
@@ -35,10 +35,10 @@
 | エラー | 修正内容 | 適用状況 |
 |---|---|---|
 | `video_ranking` timeout（BUZZ動画ランキング） | `mv_video_ranking` MV化 | ✅ MV存在確認済み |
-| `ai_penetration` timeout | `idx_videos_topic_ids` GIN | ⏳ インデックス確認中 |
-| `topic_duration_stats` timeout | `idx_videos_topic_ids` GIN | ⏳ インデックス確認中 |
-| `topic_overlap` timeout | `idx_channels_topic_ids` GIN | ⏳ インデックス確認中 |
-| `channels` saturation timeout | `idx_channels_published_at` | ⏳ インデックス確認中 |
+| `ai_penetration` timeout | `idx_videos_topic_ids` GIN | ✅ インデックス確認済み |
+| `topic_duration_stats` timeout | `idx_videos_topic_ids` GIN | ✅ インデックス確認済み |
+| `topic_overlap` timeout | `idx_channels_topic_ids` GIN | ✅ インデックス確認済み |
+| `channels` saturation timeout | `idx_channels_published_at` | ✅ インデックス確認済み |
 | `fn_keyword_virality` timeout | `mv_video_tags` + `mv_keyword_virality` | ✅ MV存在確認済み |
 | `fn_keyword_opportunity` timeout | `mv_video_tags` + `mv_keyword_opportunity` | ✅ MV存在確認済み |
 
@@ -64,16 +64,15 @@
 - `mv_topic_summary`, `mv_topic_channel_size`, `mv_topic_popular_tags` 等 ✅
 - 全ビュー・RPC関数のMV参照化（migrate_performance_indexes.sql）
 
-### 要確認（インデックス4本）
-以下のSQLで存在確認：
-```sql
-SELECT indexname, tablename FROM pg_indexes 
-WHERE indexname IN ('idx_videos_published_at','idx_channels_published_at','idx_videos_topic_ids','idx_channels_topic_ids')
-ORDER BY indexname;
-```
-4行返れば全OK。不足があれば以下で追加：
+### 確認済み ✅（インデックス4本、2026-05-08確認）
+| インデックス | テーブル |
+|---|---|
+| idx_channels_published_at | channels |
+| idx_channels_topic_ids | channels |
+| idx_videos_published_at | videos |
+| idx_videos_topic_ids | videos |
 
-### 未実行 ❌（インデックスが不足している場合のみ）
+### 未実行 ❌（インデックスが不足している場合のみ — 現在は全て適用済みのため不要）
 以下のSQLを Supabase SQL Editor に **全部まとめて** コピペして Run する：
 
 ```sql
@@ -342,7 +341,23 @@ REFRESH MATERIALIZED VIEW mv_video_tags;  -- 追加予定
 
 ## 次のセッションでやること（優先順）
 
-### 1. 以下のSQLを Supabase SQL Editor に全部コピペして Run（最重要）
+### ✅ 全MV・全インデックス適用完了（2026-05-08）
+- 全16MV確認済み
+- インデックス4本確認済み
+- PR #41 マージ済み
+
+### 1. ダッシュボードをリロードして全チャートOK確認（最重要）
+ブラウザでダッシュボードを開き、以下のチャートがタイムアウトなしで表示されることを確認：
+- BuzzPickup（BUZZ動画ランキング）
+- SaturationChart（チャンネル飽和度）
+- TopicDurationStats（トピック別動画長）
+- AiPenetration（AI侵食率）
+- TopicOverlap（トピック重複）
+- KeywordOpportunity（キーワード機会）
+- KeywordVirality（キーワードバイラル性）
+
+### 2. まだタイムアウトが残る場合
+以下のSQLを Supabase SQL Editor に全部コピペして Run：
 
 ```sql
 -- video_ranking MV化 + keyword系 mv_video_tags 参照化
