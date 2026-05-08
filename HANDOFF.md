@@ -28,6 +28,9 @@
 | 10 | インデックス4本の存在確認SQL提示（ユーザー実行待ち） | ✅ **全4本確認済み** |
 | 11 | 500エラー根本原因特定（GRANT不足・タイムアウト4種） | ✅ 特定済み |
 | 12 | `sql/migrate_fix_500_errors.sql` 作成・実行 | ✅ **Success. No rows returned** |
+| 13 | BuzzPickup ✅ / fn_keyword ✅ / topic_overlap ✅ 確認 | ✅ |
+| 14 | fn_ai_penetration / fn_topic_duration_stats タイムアウト原因特定 | ✅ JOIN videos ON t.id = ANY(topic_ids) がGIN未使用 |
+| 15 | `sql/migrate_fix_topic_views.sql` 作成（mv_video_topics + 2MV） | ⏳ ユーザー実行待ち |
 
 ---
 
