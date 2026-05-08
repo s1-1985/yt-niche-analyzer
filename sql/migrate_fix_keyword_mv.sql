@@ -1,27 +1,82 @@
 -- ============================================================
--- キーワード分析MV対応 + インデックス追加
+-- キーワード分析MV対応 + インデックス追加 + channel_growth_efficiency MV化
 -- 解消するエラー:
 --   fn_keyword_virality    500 → MV参照に変更
 --   fn_keyword_opportunity 500 → MV参照に変更
---   video_ranking          500 → published_at インデックス追加
+--   video_ranking          500 → videos.published_at インデックス追加
 --   topic_overlap          500 → channels.topic_ids GINインデックス追加
+--   channel_growth_efficiency 500 → MV化（ORDER BY 計算列を事前計算）
+--   channels 500(SaturationChart) → channels.published_at インデックス追加
 --   fn_ai_penetration / fn_topic_duration_stats タイムアウト
 --                              → videos.topic_ids GINインデックス追加
 -- ============================================================
 
 -- 1. インデックス追加
 
--- BuzzPickup の .gte('published_at', ...) フィルタ + ORDER BY buzz_score 高速化
+-- BuzzPickup の .gte('published_at', ...) フィルタ高速化
 CREATE INDEX IF NOT EXISTS idx_videos_published_at
     ON videos(published_at DESC);
+
+-- SaturationChart: channels.gte('published_at', ...) 高速化
+CREATE INDEX IF NOT EXISTS idx_channels_published_at
+    ON channels(published_at DESC);
 
 -- topic_overlap / fn_ai_penetration / fn_topic_duration_stats 高速化
 CREATE INDEX IF NOT EXISTS idx_videos_topic_ids
     ON videos USING GIN(topic_ids);
 
--- topic_overlap / channel_ranking フィルタ高速化
+-- topic_overlap 高速化
 CREATE INDEX IF NOT EXISTS idx_channels_topic_ids
     ON channels USING GIN(topic_ids);
+
+-- ============================================================
+-- 2. channel_growth_efficiency をマテリアライズドビュー化
+--    ORDER BY subs_per_day（計算列）がタイムアウトの原因
+-- ============================================================
+DROP VIEW IF EXISTS channel_growth_efficiency CASCADE;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_channel_growth_efficiency AS
+SELECT
+    c.id AS channel_id, c.title, c.published_at, c.country, c.topic_ids,
+    cs.subscriber_count, cs.view_count, cs.video_count,
+    GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1)::INTEGER AS age_days,
+    CASE WHEN EXTRACT(EPOCH FROM (NOW() - c.published_at)) > 0
+        THEN ROUND(cs.subscriber_count::NUMERIC / GREATEST(EXTRACT(EPOCH FROM (NOW() - c.published_at)) / 86400, 1), 2)
+        ELSE 0
+    END AS subs_per_day,
+    CASE WHEN cs.video_count > 0
+        THEN ROUND(cs.view_count::NUMERIC / cs.video_count)
+        ELSE 0
+    END AS views_per_video
+FROM channels c
+JOIN mv_latest_channel_snapshot cs ON c.id = cs.channel_id
+WHERE c.published_at IS NOT NULL AND cs.subscriber_count > 0;
+
+CREATE INDEX IF NOT EXISTS idx_mv_channel_growth_subs_per_day
+    ON mv_channel_growth_efficiency(subs_per_day DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_channel_growth_channel_id
+    ON mv_channel_growth_efficiency(channel_id);
+
+-- フロントエンドは channel_growth_efficiency ビュー名のままで動くようにする
+CREATE VIEW channel_growth_efficiency AS
+SELECT
+    channel_id, title, published_at, country, topic_ids,
+    subscriber_count, view_count, video_count,
+    age_days, subs_per_day, views_per_video
+FROM mv_channel_growth_efficiency;
+
+-- ============================================================
+-- 3. refresh_latest_snapshots() に新MVを追加
+-- ============================================================
+CREATE OR REPLACE FUNCTION refresh_latest_snapshots()
+RETURNS void AS $fn$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_video_snapshot;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_latest_channel_snapshot;
+    REFRESH MATERIALIZED VIEW mv_channel_growth_efficiency;
+END;
+$fn$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
 -- 2. keyword_opportunity ビュー: DISTINCT ON → MV参照
