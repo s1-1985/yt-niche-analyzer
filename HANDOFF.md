@@ -23,7 +23,8 @@
 | 5 | SQL ①〜④ をユーザーに提示（インデックス+MV+タグMV） | ✅ 提示済み・実行済み |
 | 6 | ①〜④実行後もBUZZ/keyword系3件timeout残存を確認 | ✅ 確認 |
 | 7 | `sql/migrate_mv_video_ranking_and_tags.sql` 作成・プッシュ | ✅ fdd9bbe |
-| 8 | 上記SQLをユーザーに提示（次のセッションで実行待ち） | ✅ 提示済み・**未実行** |
+| 8 | 上記SQLをユーザーに提示 | ✅ 提示済み |
+| 9 | `migrate_mv_video_ranking_and_tags.sql` Supabaseで実行 | ✅ 実行済み・結果確認待ち |
 
 ---
 
