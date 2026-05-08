@@ -84,7 +84,7 @@ export function useFilteredQuery<T>(
             setState({
               data: [],
               loading: false,
-              error: `フィルタの適用に失敗しました。SQLマイグレーション(migrate_add_country_filter.sql)の実行が必要です。`,
+              error: `データ取得エラー: ${error.message}`,
             });
           } else {
             console.warn(`RPC fn_${view} failed, falling back to view:`, error.message);
