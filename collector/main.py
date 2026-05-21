@@ -110,6 +110,11 @@ def main():
             ch["topic_ids"] = list(injected)
 
         # 5. Supabase に書き込み（チャンネルを先に入れて外部キー制約を満たす）
+        # YouTube API で取得できなかったチャンネル（削除済み・非公開等）の
+        # 動画は外部キー制約違反になるため除外する
+        valid_channel_ids = {ch["id"] for ch in channels}
+        videos = [v for v in videos if v.get("channel_id") in valid_channel_ids]
+
         n_channels = upsert_channels(sb, channels)
         n_videos = upsert_videos(sb, videos)
 
