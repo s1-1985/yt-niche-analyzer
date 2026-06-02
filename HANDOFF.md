@@ -64,6 +64,25 @@ B適用後・A修正後に同じ方法で再テストして200を確認する。
 国フィルタ時のタグ集計が重い（~30s）のは既知。恒久対策は国別事前計算MV（将来課題）。
 デフォルト/期間/short/normal/ランキングは全て高速(<8s)で正常。
 
+### 🔴 リフレッシュ基盤の問題と pg_cron 移行（2026-06-02）
+今日の collect ログ(12:00 UTC)で判明:
+- `refresh_topic_summary` が **404**（migrate_refresh_mv_topic_summary.sql 未適用）→ 総動画数が再凍結する状態
+- `refresh_analytics_mvs`(Group3)・`refresh_type_keyword_mvs`(Group6) が **120秒でタイムアウト**
+  （コレクターの supabase-py クライアント read timeout 120s が原因）→ 分析/キーワードMVが毎日更新されていない
+- 一方 Group2(derived)は66秒で成功 → ゲートウェイは66秒以上は許容
+
+**方針（ユーザー合意「無料一択」）**: MVリフレッシュを **pg_cron（DB内部）** に移行。
+クライアント/ゲートウェイのタイムアウトと無縁になり重いMVも確実に更新。
+- **Phase 1（作成済み・適用待ち）**: `sql/migrate_pgcron_refresh.sql`
+  - pg_cron有効化 ＋ refresh_topic_summary作成(404解消) ＋ refresh_all_mvs(全22MV依存順・1800s・堅牢化)
+  - 毎日 14:00 UTC にスケジュール。適用は SQL のみ（コレクター変更/マージ不要）。
+  - ※ CREATE EXTENSION で権限エラー時は Dashboard→Extensions で pg_cron 有効化してから再実行。
+  - 適用後、次の14:00 UTC実行を anon でMV鮮度確認して検証する。
+- **Phase 2（Phase1確認後）**: 国×トピック×タグ の事前計算MV追加＋RPCの国fast-path＋pg_cron組込み。
+
+【教訓の更新】重いMVは「収集後にコレクターRPCで更新」だとクライアント120秒で失敗する。
+pg_cron（DB内部）が無料枠での正解。
+
 ---
 
 ## 🔴 最優先（2026-06-02 調査）— 総動画数が約1ヶ月増えない問題
