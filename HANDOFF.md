@@ -41,6 +41,15 @@ curl -k -X POST https://mnqcjnaxnklrfgyvhsgu.supabase.co/rest/v1/rpc/<fn> \
 ```
 B適用後・A修正後に同じ方法で再テストして200を確認する。
 
+### 対応状況（2026-06-02）
+- **B（遅い）: 適用済み・実測検証OK** — `migrate_raise_frontend_timeout.sql`（anon/authenticated=15s）。
+  fn_topic_summary/channel_size 等が全て200に。video_ranking(topic絞り)も200/5s。
+- **A（コードバグ）: 修正作成（要適用）** — `sql/migrate_fix_broken_rpcs.sql`
+  - 曖昧カラム4関数 → `ALTER FUNCTION ... SET plpgsql.variable_conflict='use_column'`（本体非改変）。
+  - fn_topic_duration_stats → PERCENTILE_CONT/AVG を ::NUMERIC キャスト。
+  - keyword系404 → フロントを3引数化（KeywordVirality/OpportunityChart.tsx の p_topic_id 削除）。
+  - 適用後に anon実RPCで再検証予定。
+
 ---
 
 ## 🔴 最優先（2026-06-02 調査）— 総動画数が約1ヶ月増えない問題
