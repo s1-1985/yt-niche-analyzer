@@ -143,6 +143,7 @@ def refresh_materialized_views(client: Client):
     """
     groups = [
         ("refresh_snapshot_base",    "Group1: snapshot base"),
+        ("refresh_topic_summary",    "Group1b: topic summary (depends on snapshot base)"),
         ("refresh_derived_mvs",      "Group2: derived MVs"),
         ("refresh_analytics_mvs",    "Group3: analytics MVs"),
         ("refresh_type_base_mvs",    "Group4: type base MVs"),
