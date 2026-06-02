@@ -29,13 +29,23 @@
   （だから collection_log の更新履歴は出るのに件数だけ止まる）。
 - データ増加（約86k動画）で `REFRESH MATERIALIZED VIEW CONCURRENTLY` が8秒超になったのが引き金。
 
-### 対策（作成済み・**未実行**）
-- `sql/migrate_fix_refresh_timeout.sql` を作成。
+### 対策（適用済み・✅復旧確認 2026-06-02）
+- `sql/migrate_fix_refresh_timeout.sql` を作成（一括Run用に `sql/apply_fix_now.sql` も追加）。
   - (A) 全リフレッシュ関数に `statement_timeout = '120s'` を付与し、関数実行中だけ8秒制限を上書き。
   - (B) `refresh_snapshot_base()` を非CONCURRENTLY化（高速・安定化＋SQL Editor一括Run可能化）。
-        代償は更新中の一瞬の読み取りロックのみ（日次・夜間・低トラフィックで許容）。
-  - STEP2で即時手動リフレッシュ、STEP3で件数確認。
-- **次にやること**: このSQLを Supabase SQL Editor に貼って Run → 件数が復旧するか STEP3 で確認。
+- **結果**: SQL Editor で STEP1（関数修正）＋ `SELECT refresh_snapshot_base();` を実行。
+  - `refresh_snapshot_base()` は **2.1秒で完了**（以前は CONCURRENTLY で8秒超→失敗）。
+  - 確認クエリ（④）の結果:
+    - `videos_table_count = 140,791`
+    - `mv_snapshot_count  = 140,791`  ← **生テーブルと一致＝凍結解消の決定的証拠**
+    - `dashboard_total_videos = 86,153`（topic_summary のサブトピック合計＝指標が別物なので生テーブル数とは不一致で正常）
+
+### 残タスク / フォロー
+1. **③（重いMV）**: refresh_derived_mvs / analytics / type_* は未手動実行。
+   今夜の cron が1関数ずつ個別RPCで更新するので放置でOK。翌日 collection_log とあわせて成否確認。
+2. **要調査(別件)**: 生テーブル 140,791 vs ダッシュボード 86,153 の差（約5.4万件が
+   ジャンル集計に乗らない）。videos.topic_ids と topics の紐づけが原因の可能性。
+   今回の凍結問題とは無関係。ユーザー要望があれば調査。
 
 ---
 
