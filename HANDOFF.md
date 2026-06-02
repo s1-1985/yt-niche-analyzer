@@ -12,6 +12,37 @@
 
 ---
 
+## 🔴 進行中（2026-06-02 後半）— ダッシュボード他機能のエラー（実測デバッグ）
+
+公開バンドルから anon キー(公開JWT)を取得し、`mnqcjnaxnklrfgyvhsgu.supabase.co` の各RPCを
+実際に叩いて挙動を実測（コードベースは多版乱立＆DB乖離で追えないため）。結果、原因は2種類:
+
+### A. コードのバグ（毎回400・即死。データ量と無関係）
+| 関数 | エラー |
+|---|---|
+| fn_topic_popular_tags | 42702 column "name_ja" is ambiguous |
+| fn_channel_growth_efficiency | 42702 column "channel_id" is ambiguous |
+| fn_keyword_virality | 42702 column "tag" is ambiguous |
+| fn_keyword_opportunity | 42702 column "avg_views" is ambiguous |
+| fn_topic_duration_stats | 42804 returned double precision ≠ numeric (col 6) |
+→ 修正には**実DBの関数定義**が必要（`sql/dump_broken_functions.sql` で取得依頼中）。
+
+### B. 遅い（1〜5秒・境界で時々500）
+fn_topic_summary / fn_topic_channel_size / video_ranking(topic絞り+view順) 等。
+実測で **anon ロールの statement_timeout が約3秒**しかないのが原因。
+→ 対策: `sql/migrate_raise_frontend_timeout.sql`（anon/authenticated を15sに引き上げ）。**適用依頼中**。
+
+### 検証方法（重要・再現可能）
+```
+KEY=$(grep -oE 'eyJ...JWT...' /tmp/bundle.js | head -1)  # 公開バンドルから anon キー
+curl -k -X POST https://mnqcjnaxnklrfgyvhsgu.supabase.co/rest/v1/rpc/<fn> \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"p_min_date":"2026-05-01T00:00:00Z","p_video_type":"all","p_country":null}'
+```
+B適用後・A修正後に同じ方法で再テストして200を確認する。
+
+---
+
 ## 🔴 最優先（2026-06-02 調査）— 総動画数が約1ヶ月増えない問題
 
 ### 症状
