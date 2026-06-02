@@ -21,119 +21,55 @@
 | 3 | フロントエンドエラーメッセージ修正（PR #52 マージ済み） | ✅ |
 | 4 | requirements.txt バージョン上限ピン留め | ✅ |
 | 5 | collect.yml の外部キー制約違反修正（PR #53 マージ済み） | ✅ |
-| 6 | ベースMV（short/normal）作成 SQL → **ユーザー未実行** | ❌ |
+| 6 | ベースMV SQL → ユーザーが実行済みと申告（未検証） | ❓ |
 
 ---
 
-## Supabase 現状
+## Supabase 現状（未検証）
 
-### 実行済み MV
-| MV名 | 状態 |
-|---|---|
-| mv_latest_video_snapshot | ✅ |
-| mv_latest_channel_snapshot | ✅ |
-| mv_channel_growth_efficiency | ✅ |
-| mv_video_tags | ✅ |
-| mv_video_topics | ✅ |
-| mv_video_ranking | ✅ |
-| mv_keyword_opportunity | ✅ |
-| mv_keyword_virality | ✅ |
-| mv_ai_penetration | ✅ |
-| mv_topic_duration_stats | ✅ |
-| mv_topic_overlap | ✅ |
-| mv_keyword_opp_short/normal | ✅（migrate_fix_rpc_fastpaths.sql で作成） |
-| mv_keyword_vir_short/normal | ✅（同上） |
+ユーザーがベースMV作成SQLを実行済みと言っているが、ダッシュボードで
+video_type=short/normal が正常動作するかまだ確認していない。
 
-### 未作成 ❌（video_type フィルタが動かない原因）
-| MV名 | 状態 |
-|---|---|
-| mv_topic_video_short | ❌ |
-| mv_topic_video_normal | ❌ |
-| mv_active_ch_short | ❌ |
-| mv_active_ch_normal | ❌ |
-| mv_topic_overlap_short | ❌ |
-| mv_topic_overlap_normal | ❌ |
+### 次のセッション開始時に最初にやること
+
+**1. 診断クエリで MV の存在を確認**
+
+Supabase SQL Editor で実行：
+```sql
+SELECT matviewname FROM pg_matviews
+WHERE matviewname LIKE 'mv_%short%' OR matviewname LIKE 'mv_%normal%'
+ORDER BY matviewname;
+```
+
+期待される結果（6行）:
+```
+mv_active_ch_normal
+mv_active_ch_short
+mv_keyword_opp_normal
+mv_keyword_opp_short
+mv_keyword_vir_normal
+mv_keyword_vir_short
+mv_topic_overlap_normal
+mv_topic_overlap_short
+mv_topic_video_normal
+mv_topic_video_short
+```
+
+**2. ダッシュボードで video_type=ショート に切り替えて全チャートを確認**
+- エラーなし → 完了 ✅
+- エラーあり → エラー内容を Claude Code に共有
 
 ---
 
-## 次のセッションでやること（最優先）
+## 既知の修正済み問題
 
-### 1. Supabase SQL Editor で2回に分けて実行
-
-**実行1回目（速い・確実）:**
-```sql
-DROP MATERIALIZED VIEW IF EXISTS mv_topic_video_short CASCADE;
-CREATE MATERIALIZED VIEW mv_topic_video_short AS
-SELECT vt.topic_id, vt.video_id, vt.channel_id, vt.published_at,
-       vt.has_ai_keywords, vt.duration_seconds,
-       vs.view_count, vs.like_count, vs.comment_count
-FROM mv_video_topics vt
-JOIN mv_latest_video_snapshot vs ON vt.video_id = vs.video_id
-WHERE vt.duration_seconds <= 60;
-CREATE INDEX ON mv_topic_video_short(topic_id);
-CREATE INDEX ON mv_topic_video_short(channel_id);
-GRANT SELECT ON mv_topic_video_short TO anon, authenticated;
-
-DROP MATERIALIZED VIEW IF EXISTS mv_topic_video_normal CASCADE;
-CREATE MATERIALIZED VIEW mv_topic_video_normal AS
-SELECT vt.topic_id, vt.video_id, vt.channel_id, vt.published_at,
-       vt.has_ai_keywords, vt.duration_seconds,
-       vs.view_count, vs.like_count, vs.comment_count
-FROM mv_video_topics vt
-JOIN mv_latest_video_snapshot vs ON vt.video_id = vs.video_id
-WHERE vt.duration_seconds > 60;
-CREATE INDEX ON mv_topic_video_normal(topic_id);
-CREATE INDEX ON mv_topic_video_normal(channel_id);
-GRANT SELECT ON mv_topic_video_normal TO anon, authenticated;
-
-DROP MATERIALIZED VIEW IF EXISTS mv_active_ch_short CASCADE;
-CREATE MATERIALIZED VIEW mv_active_ch_short AS
-SELECT DISTINCT channel_id FROM mv_video_topics WHERE duration_seconds <= 60;
-CREATE INDEX ON mv_active_ch_short(channel_id);
-GRANT SELECT ON mv_active_ch_short TO anon, authenticated;
-
-DROP MATERIALIZED VIEW IF EXISTS mv_active_ch_normal CASCADE;
-CREATE MATERIALIZED VIEW mv_active_ch_normal AS
-SELECT DISTINCT channel_id FROM mv_video_topics WHERE duration_seconds > 60;
-CREATE INDEX ON mv_active_ch_normal(channel_id);
-GRANT SELECT ON mv_active_ch_normal TO anon, authenticated;
-```
-
-**実行2回目（overlap MV、少し重い）:**
-```sql
-DROP MATERIALIZED VIEW IF EXISTS mv_topic_overlap_short CASCADE;
-CREATE MATERIALIZED VIEW mv_topic_overlap_short AS
-SELECT t1.id AS topic_a, t1.name_ja AS name_a,
-       t2.id AS topic_b, t2.name_ja AS name_b,
-       COUNT(DISTINCT c.id)::BIGINT AS shared_channels
-FROM channels c
-JOIN mv_active_ch_short ac ON c.id = ac.channel_id
-JOIN topics t1 ON t1.id = ANY(c.topic_ids) AND t1.parent_id IS NOT NULL
-JOIN topics t2 ON t2.id = ANY(c.topic_ids) AND t2.parent_id IS NOT NULL
-WHERE t1.id < t2.id
-GROUP BY t1.id, t1.name_ja, t2.id, t2.name_ja
-HAVING COUNT(DISTINCT c.id) >= 2;
-GRANT SELECT ON mv_topic_overlap_short TO anon, authenticated;
-
-DROP MATERIALIZED VIEW IF EXISTS mv_topic_overlap_normal CASCADE;
-CREATE MATERIALIZED VIEW mv_topic_overlap_normal AS
-SELECT t1.id AS topic_a, t1.name_ja AS name_a,
-       t2.id AS topic_b, t2.name_ja AS name_b,
-       COUNT(DISTINCT c.id)::BIGINT AS shared_channels
-FROM channels c
-JOIN mv_active_ch_normal ac ON c.id = ac.channel_id
-JOIN topics t1 ON t1.id = ANY(c.topic_ids) AND t1.parent_id IS NOT NULL
-JOIN topics t2 ON t2.id = ANY(c.topic_ids) AND t2.parent_id IS NOT NULL
-WHERE t1.id < t2.id
-GROUP BY t1.id, t1.name_ja, t2.id, t2.name_ja
-HAVING COUNT(DISTINCT c.id) >= 2;
-GRANT SELECT ON mv_topic_overlap_normal TO anon, authenticated;
-```
-
-両方「Success. No rows returned」になったら video_type=short/normal フィルタが動く。
-
-### 2. collect.yml 手動実行で確認
-GitHub Actions → Collect YouTube Data → Run workflow → 成功することを確認
+| 問題 | 修正 | PR |
+|---|---|---|
+| short/normal フィルタで全RPC 500タイムアウト | 事前計算MV + fast path | #48〜#51 |
+| NUMERIC(5,2) オーバーフロー | NUMERIC(8,2) に変更 | #49 |
+| フロントエンドの誤解を招くエラーメッセージ | 実際のエラー内容を表示 | #52 |
+| collect.yml が毎日クラッシュ（外部キー違反） | 削除済みチャンネルの動画を除外 | #53 |
+| requirements.txt バージョン上限なし | メジャーバージョン上限を追加 | #53 |
 
 ---
 
@@ -141,8 +77,32 @@ GitHub Actions → Collect YouTube Data → Run workflow → 成功すること�
 
 | ファイル | 状態 |
 |---|---|
-| `sql/migrate_create_base_type_mvs.sql` | ✅ コミット済み・Supabase未実行 |
+| `sql/migrate_create_base_type_mvs.sql` | ✅ コミット済み・Supabase実行済み（未検証） |
 | `sql/migrate_fix_rpc_fastpaths.sql` | ✅ 実行済み（RPC関数更新完了） |
 | `collector/main.py` | ✅ 外部キー修正マージ済み（PR #53） |
 | `collector/requirements.txt` | ✅ バージョン上限追加済み |
 | `frontend/src/hooks/useFilteredQuery.ts` | ✅ エラーメッセージ修正済み |
+
+---
+
+## アーキテクチャメモ（RPC fast path）
+
+- フィルタなし（all/all/null）→ 静的ビュー直読み（最速）
+- short/normal のみ → MV直読み（fast path、事前計算）
+- 期間 or 国フィルタ → MV結合の動的クエリ（十分速い）
+- Supabase Free プランの statement timeout: 8秒
+
+### MV依存関係（リフレッシュ順序）
+```
+Group1: mv_latest_video_snapshot, mv_latest_channel_snapshot
+  ↓
+Group2: mv_channel_growth_efficiency, mv_video_tags, mv_video_topics, mv_video_ranking
+  ↓
+Group3: mv_ai_penetration, mv_topic_duration_stats, mv_keyword_opportunity,
+        mv_keyword_virality, mv_topic_overlap
+  ↓
+Group4: mv_topic_video_short/normal, mv_active_ch_short/normal
+  ↓
+Group5: mv_topic_overlap_short/normal
+Group6: mv_keyword_opp_short/normal, mv_keyword_vir_short/normal
+```
