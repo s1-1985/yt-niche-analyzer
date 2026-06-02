@@ -29,7 +29,7 @@
   （だから collection_log の更新履歴は出るのに件数だけ止まる）。
 - データ増加（約86k動画）で `REFRESH MATERIALIZED VIEW CONCURRENTLY` が8秒超になったのが引き金。
 
-### 対策（適用済み・✅復旧確認 2026-06-02）
+### 対策（適用済み・⚠️ただし総動画数は変化せず＝真因は別 2026-06-02）
 - `sql/migrate_fix_refresh_timeout.sql` を作成（一括Run用に `sql/apply_fix_now.sql` も追加）。
   - (A) 全リフレッシュ関数に `statement_timeout = '120s'` を付与し、関数実行中だけ8秒制限を上書き。
   - (B) `refresh_snapshot_base()` を非CONCURRENTLY化（高速・安定化＋SQL Editor一括Run可能化）。
@@ -38,14 +38,18 @@
   - 確認クエリ（④）の結果:
     - `videos_table_count = 140,791`
     - `mv_snapshot_count  = 140,791`  ← **生テーブルと一致＝凍結解消の決定的証拠**
-    - `dashboard_total_videos = 86,153`（topic_summary のサブトピック合計＝指標が別物なので生テーブル数とは不一致で正常）
+    - `dashboard_total_videos = 86,153`
 
-### 残タスク / フォロー
-1. **③（重いMV）**: refresh_derived_mvs / analytics / type_* は未手動実行。
-   今夜の cron が1関数ずつ個別RPCで更新するので放置でOK。翌日 collection_log とあわせて成否確認。
-2. **要調査(別件)**: 生テーブル 140,791 vs ダッシュボード 86,153 の差（約5.4万件が
-   ジャンル集計に乗らない）。videos.topic_ids と topics の紐づけが原因の可能性。
-   今回の凍結問題とは無関係。ユーザー要望があれば調査。
+### ⚠️ 重要な訂正（ユーザー指摘 2026-06-02）
+- **ダッシュボード「総動画数」は修正前から 86,153 のままで、MVリフレッシュ後も変化なし。**
+- つまり MV凍結はログ上は実在したが、**ユーザーの本当の問題（総動画数が約1ヶ月増えない）の真因ではなかった。**
+  （MV凍結の修正自体は再生数・ランキング等の鮮度には有効なので無駄ではない）
+- コード調査: `videos` テーブルを削除する処理は存在しない＝本来は単調増加するはず。
+- 仮説の切り分け中:
+  - A: コレクターが新規動画を追加できていない（discovery が同じ動画を上書きするだけ）
+  - B: 動画は増えているが topic_summary 集計に乗っていない（topic_ids と topics の紐づけ）
+- **次にやること**: `sql/diagnose_growth.sql` をユーザーが Run。
+  `new_videos_30d` が ≈0 なら A（収集側）、大きいなら B（集計側）に確定 → そこを直す。
 
 ---
 
