@@ -31,8 +31,10 @@
 
 ### 対策（作成済み・**未実行**）
 - `sql/migrate_fix_refresh_timeout.sql` を作成。
-  全リフレッシュ関数に `ALTER FUNCTION ... SET statement_timeout = '120s'` を付与し、
-  関数実行中だけ8秒制限を上書きする。STEP2で即時手動リフレッシュ、STEP3で件数確認。
+  - (A) 全リフレッシュ関数に `statement_timeout = '120s'` を付与し、関数実行中だけ8秒制限を上書き。
+  - (B) `refresh_snapshot_base()` を非CONCURRENTLY化（高速・安定化＋SQL Editor一括Run可能化）。
+        代償は更新中の一瞬の読み取りロックのみ（日次・夜間・低トラフィックで許容）。
+  - STEP2で即時手動リフレッシュ、STEP3で件数確認。
 - **次にやること**: このSQLを Supabase SQL Editor に貼って Run → 件数が復旧するか STEP3 で確認。
 
 ---
