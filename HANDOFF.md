@@ -56,13 +56,20 @@
   → 作成時点（約1ヶ月前=86,153件）で凍結。誰も更新しないため総動画数が固定されていた。
 - **DBがリポジトリから乖離している**（mv_topic_summary はSupabase上で直接作られた）。
 
-### 次にやること
-1. **即時復旧**: `sql/fix_mv_topic_summary.sql`（`REFRESH MATERIALIZED VIEW mv_topic_summary;`）を実行
-   → `dashboard_total` が 86,153 から12万件前後に増えれば復旧。
-2. **恒久対策**: `mv_topic_summary` を日次リフレッシュ関数に追加する。
-   `SELECT pg_get_viewdef('mv_topic_summary', true);` で定義を取得 → 依存関係に応じて
-   refresh_derived_mvs / refresh_analytics_mvs に `REFRESH MATERIALIZED VIEW mv_topic_summary;` を追加。
-   併せて mv_topic_summary の定義をリポジトリSQLに取り込み乖離を解消する。
+### ✅ 解決（2026-06-02）
+1. **即時復旧 完了**: `REFRESH MATERIALIZED VIEW mv_topic_summary;` 実行 →
+   `dashboard_total` が **86,153 → 121,925** に回復。ダッシュボードの総動画数が復活。
+2. **恒久対策 実装済み（要適用）**: `sql/migrate_refresh_mv_topic_summary.sql` を追加。
+   - 専用関数 `refresh_topic_summary()`（statement_timeout=120s, mv_topic_summary をREFRESH）を新設（既存関数は非変更）。
+   - mv_topic_summary 定義をリポジトリに記録（IF NOT EXISTS）＋ topic_summary 薄ラッパビューも記録。
+   - `collector/supabase_client.py` のグループ列に `refresh_topic_summary`(Group1b) を追加。
+   - mv_topic_summary の定義 = topics × videos × mv_latest_video_snapshot の集計（migrate_performance_indexes の topic_summary と同一内容）。
+
+### 残作業（ユーザー）
+- `sql/migrate_refresh_mv_topic_summary.sql` を Supabase SQL Editor で実行（refresh_topic_summary 関数を作成）。
+- ブランチをマージ → 以降の日次cronが mv_topic_summary を毎日リフレッシュ（再凍結しない）。
+- 教訓: **DBがリポジトリから乖離している**箇所が他にもある可能性。ダッシュボードが参照する
+  ビューが「マテビューの薄いラッパ」かどうか、refresh対象に入っているかを今後要確認。
 
 ---
 
