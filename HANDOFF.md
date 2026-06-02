@@ -45,11 +45,24 @@
 - つまり MV凍結はログ上は実在したが、**ユーザーの本当の問題（総動画数が約1ヶ月増えない）の真因ではなかった。**
   （MV凍結の修正自体は再生数・ランキング等の鮮度には有効なので無駄ではない）
 - コード調査: `videos` テーブルを削除する処理は存在しない＝本来は単調増加するはず。
-- 仮説の切り分け中:
-  - A: コレクターが新規動画を追加できていない（discovery が同じ動画を上書きするだけ）
-  - B: 動画は増えているが topic_summary 集計に乗っていない（topic_ids と topics の紐づけ）
-- **次にやること**: `sql/diagnose_growth.sql` をユーザーが Run。
-  `new_videos_30d` が ≈0 なら A（収集側）、大きいなら B（集計側）に確定 → そこを直す。
+
+### ✅ 真因の特定（2026-06-02）
+診断クエリで切り分けた結果:
+- `videos` = 140,791件、直近30日の純増 `new_videos_30d` = 49,076 → **DBは猛烈に増えている**（収集は正常）
+- 紐づけも正常（サブトピック紐づけ 121,925件、新規49kのうち 43,321件が紐づく）
+- なのに `topic_summary` 合計 = 86,153 で矛盾（紐づく121,925 > 合計86,153 はありえない）
+- **`topic_summary` ビューの実体 = `SELECT ... FROM mv_topic_summary;`（226文字）**
+- **`mv_topic_summary` はマテビューで、どのリフレッシュ関数にも含まれず、リポジトリSQLにも存在しない**
+  → 作成時点（約1ヶ月前=86,153件）で凍結。誰も更新しないため総動画数が固定されていた。
+- **DBがリポジトリから乖離している**（mv_topic_summary はSupabase上で直接作られた）。
+
+### 次にやること
+1. **即時復旧**: `sql/fix_mv_topic_summary.sql`（`REFRESH MATERIALIZED VIEW mv_topic_summary;`）を実行
+   → `dashboard_total` が 86,153 から12万件前後に増えれば復旧。
+2. **恒久対策**: `mv_topic_summary` を日次リフレッシュ関数に追加する。
+   `SELECT pg_get_viewdef('mv_topic_summary', true);` で定義を取得 → 依存関係に応じて
+   refresh_derived_mvs / refresh_analytics_mvs に `REFRESH MATERIALIZED VIEW mv_topic_summary;` を追加。
+   併せて mv_topic_summary の定義をリポジトリSQLに取り込み乖離を解消する。
 
 ---
 
