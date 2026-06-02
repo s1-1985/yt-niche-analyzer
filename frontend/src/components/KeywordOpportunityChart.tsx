@@ -51,7 +51,6 @@ export function KeywordOpportunityChart({ period, videoType = 'all', country = n
       p_min_date: minDate,
       p_video_type: videoType,
       p_country: country,
-      p_topic_id: null,
     }).then((res) => {
       if (cancelled) return;
       setData((res.data as KeywordOpportunity[]) ?? []);
