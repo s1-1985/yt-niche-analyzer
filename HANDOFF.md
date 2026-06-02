@@ -8,7 +8,34 @@
 ---
 
 ## 現在のブランチ
-`claude/verify-materialized-views-eRnyj`
+`claude/hopeful-babbage-g5QTg`
+
+---
+
+## 🔴 最優先（2026-06-02 調査）— 総動画数が約1ヶ月増えない問題
+
+### 症状
+- 更新履歴（collection_log）には前日分まで GitHub Actions の収集が記録されている
+- なのに「総動画数」(topic_summary) が約1ヶ月前から増えていない
+
+### 根本原因（確定）
+**MVリフレッシュが Supabase Free の statement timeout (8秒) を超えて失敗し続けている。**
+- GitHub Actions ログ（2026-06-01 のラン）で確認:
+  `refresh failed [Group1: snapshot base]: 'canceling statement due to statement timeout', code '57014'`
+  （Group2/3/6 も同様にタイムアウト。Group4/5 は古いデータを読むだけなので 204 成功）
+- `topic_summary` は `videos JOIN mv_latest_video_snapshot`（INNER JOIN）。
+  MVが凍結 → 先月以降に収集した動画がJOINで除外 → 件数が増えない。
+- `videos` / `video_snapshots` テーブル自体には毎日正常に書き込まれている
+  （だから collection_log の更新履歴は出るのに件数だけ止まる）。
+- データ増加（約86k動画）で `REFRESH MATERIALIZED VIEW CONCURRENTLY` が8秒超になったのが引き金。
+
+### 対策（作成済み・**未実行**）
+- `sql/migrate_fix_refresh_timeout.sql` を作成。
+  - (A) 全リフレッシュ関数に `statement_timeout = '120s'` を付与し、関数実行中だけ8秒制限を上書き。
+  - (B) `refresh_snapshot_base()` を非CONCURRENTLY化（高速・安定化＋SQL Editor一括Run可能化）。
+        代償は更新中の一瞬の読み取りロックのみ（日次・夜間・低トラフィックで許容）。
+  - STEP2で即時手動リフレッシュ、STEP3で件数確認。
+- **次にやること**: このSQLを Supabase SQL Editor に貼って Run → 件数が復旧するか STEP3 で確認。
 
 ---
 
@@ -55,7 +82,9 @@
 | mv_topic_overlap | ✅ |
 
 ### 未実行 ❌（次のセッションでやること）
-**`sql/migrate_precompute_video_types.sql`** を Supabase SQL Editor で実行する
+1. **`sql/migrate_fix_refresh_timeout.sql`**（🔴最優先 / 2026-06-02）
+   — 総動画数が増えない問題の修正。MVリフレッシュの8秒タイムアウト対策。
+2. **`sql/migrate_precompute_video_types.sql`** を Supabase SQL Editor で実行する
 
 このファイルで行うこと:
 1. 10個の新規MV作成（short/normal 事前計算）
@@ -119,6 +148,12 @@ groups = [
 ---
 
 ## 次のセッションでやること
+
+### 0. 🔴 `sql/migrate_fix_refresh_timeout.sql` を Supabase SQL Editor で実行（最優先）
+   - 「総動画数が約1ヶ月増えない」問題の修正
+   - STEP1（ALTER FUNCTION）→ STEP2（手動リフレッシュ）→ STEP3（件数確認）の順で1ファイルを Run
+   - STEP3 で `mv_snapshot_count` が `videos_table_count` に追いついていれば復旧
+   - 以降は日次 cron（08:00 UTC）でMVが更新され続けるか、翌日 collection_log とあわせて確認
 
 ### 1. `sql/migrate_precompute_video_types.sql` を Supabase SQL Editor で実行
    - ファイル内容を全コピペして Run
