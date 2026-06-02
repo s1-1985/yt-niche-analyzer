@@ -49,6 +49,20 @@ B適用後・A修正後に同じ方法で再テストして200を確認する。
   - fn_topic_duration_stats → PERCENTILE_CONT/AVG を ::NUMERIC キャスト。
   - keyword系404 → フロントを3引数化（KeywordVirality/OpportunityChart.tsx の p_topic_id 削除）。
   - 適用後に anon実RPCで再検証予定。
+- **A適用後の実測（2026-06-02）**: 曖昧4関数は200に回復✅。ただし `fn_topic_duration_stats` で
+  別問題が判明：(1)関数は8列の別形を返す古い設計で、フロント/MV/静的ビューの**12列形と乖離**、
+  (2)フィルタ時のライブ集計が16.5秒で重い。
+  → `sql/migrate_fix_duration_stats_shape.sql` 追加：12列形にDROP+再作成、分位点を
+  PERCENTILE_CONT(ARRAY[…])で1ソート化、重い関数に statement_timeout=30s 付与。**適用待ち**。
+- **教訓**: 関数の戻り値「形」もフロント/MVと乖離しうる。200でも中身が出ない場合は
+  実DBのMV/ビューの列名(`?limit=1`)とフロントが使う列を突き合わせること。
+
+### 徹底検証（実RPC総当たり 2026-06-02）
+全静的ビュー＋13RPC×{デフォルト/short/normal/国JP} を実測。**ほぼ全て200**。
+唯一: `fn_topic_popular_tags`+国JP が 32.9秒で500、`fn_keyword_opportunity`+国JP が29.4秒（境界）。
+→ `sql/migrate_bump_tag_timeouts.sql`：タグ/キーワード3関数を 60s に引上げ（**適用待ち**）。
+国フィルタ時のタグ集計が重い（~30s）のは既知。恒久対策は国別事前計算MV（将来課題）。
+デフォルト/期間/short/normal/ランキングは全て高速(<8s)で正常。
 
 ---
 
