@@ -74,12 +74,30 @@ function App() {
   const [overlapData, setOverlapData] = useState<TopicOverlap[]>([]);
 
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [healthInfo, setHealthInfo] = useState<{ ok: boolean; issues: string[] } | null>(null);
   useEffect(() => {
-    supabase.from('collection_log').select('collected_at')
-      .order('collected_at', { ascending: false }).limit(1)
+    supabase
+      .from('system_health')
+      .select('latest_snapshot, ok, issues')
+      .order('checked_at', { ascending: false })
+      .limit(1)
       .then((res) => {
-        const d = res.data as { collected_at: string }[] | null;
-        if (d && d.length > 0) setLastUpdated(d[0].collected_at);
+        const rows = res.data as Array<{ latest_snapshot: string; ok: boolean; issues: string[] }> | null;
+        if (rows && rows.length > 0 && rows[0].latest_snapshot) {
+          setLastUpdated(rows[0].latest_snapshot);
+          setHealthInfo({ ok: rows[0].ok, issues: rows[0].issues ?? [] });
+          return;
+        }
+        // system_health が空の場合は collection_log にフォールバック
+        supabase
+          .from('collection_log')
+          .select('collected_at')
+          .order('collected_at', { ascending: false })
+          .limit(1)
+          .then((res2) => {
+            const rows2 = res2.data as Array<{ collected_at: string }> | null;
+            if (rows2 && rows2.length > 0) setLastUpdated(rows2[0].collected_at);
+          });
       });
   }, []);
 
@@ -176,7 +194,19 @@ function App() {
         <p>ジャンル別の需給ギャップ・競合分析ダッシュボード</p>
         {lastUpdated && (
           <div className="last-updated">
-            <span>最終更新: {new Date(lastUpdated).toLocaleString('ja-JP')}</span>
+            <span>
+              最終更新: {lastUpdated.length === 10
+                ? new Date(lastUpdated + 'T00:00:00').toLocaleDateString('ja-JP')
+                : new Date(lastUpdated).toLocaleString('ja-JP')}
+              {healthInfo !== null && (
+                <span
+                  className={healthInfo.ok ? 'health-ok' : 'health-warn'}
+                  title={healthInfo.ok ? 'システム正常' : `警告: ${healthInfo.issues.join(' / ')}`}
+                >
+                  {' '}{healthInfo.ok ? '✓' : '⚠'}
+                </span>
+              )}
+            </span>
             <button className="history-btn" onClick={() => setShowHistory(true)}>更新履歴</button>
             <button className="history-btn" onClick={() => setShowDataStats(true)}>データベース</button>
             {!isCompetitiveMode && fTopics.length > 0 && (

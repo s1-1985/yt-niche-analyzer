@@ -8,7 +8,45 @@
 ---
 
 ## 現在のブランチ
-`claude/hopeful-babbage-g5QTg`
+`claude/intelligent-knuth-oewMv`
+
+---
+
+## 🚀 Turso 移行（最優先・進行中）
+
+### 背景と決定事項（前セッション確定）
+- Supabase Free 枠が **605MB > 500MB 超過**（主因：MV 22個 = 再生成可能キャッシュ）
+- Supabase の anon タイムアウト（国フィルタ×タグ集計が ~30 秒）も根本解決したい
+- **決定: Supabase → Turso (LibSQL/SQLite edge DB) に移行**
+  - 生データのみ Turso に置く（62MB）、MV 22個は全廃
+  - 集計はその場計算（SQLite ならタイムアウト制限なし・Turso は 9GB 枠）
+  - 構造がシンプルになり drift 地獄も消滅
+
+### スパイク実測結果（前セッション・GO 確定）
+| クエリ | 実測 |
+|---|---|
+| 全ジャンル×タグ上位10（全85万タグ走査・最悪ケース） | 1.9秒 |
+| 国=JP フィルタ | 0.78秒 |
+| 国=JP ＋ 90日 ＋ short | 0.26秒 |
+| KPI (topic_summary) 既定 | 0.73秒 |
+
+→ Supabase で 30秒だった国フィルタ集計が 0.8秒。GO 確定。
+
+### Phase 0 完了（前セッション）✅
+- Turso DB 作成済み
+- GitHub Secrets 登録済み: `TURSO_AUTH_TOKEN` / `TURSO_DATABASE_URL`
+
+### Phase 1 完了（本セッション 2026-06-03）✅
+- `turso/schema.sql` — SQLite スキーマ（配列→junction テーブル正規化・インデックス付き）
+- `turso/sync.py` — Supabase → Turso 一回限り移行パイプライン（90日スナップ）
+- `collector/turso_client.py` — Turso 書き込みクライアント
+- `collector/main.py` — dual-write 対応（Turso 失敗は non-critical）
+- `collector/requirements.txt` — `libsql-client>=0.3.0` 追加
+
+### Phase 2（次：フロントエンドの Turso クエリ移行）
+- フロントエンドの RPC 呼び出しを Supabase から Turso HTTP API 直クエリに切り替え
+- 各 `fn_*` 関数に相当する SQL を SQLite で書き直す
+- 段階的に切り替え（Supabase を fallback にしつつ）
 
 ---
 
@@ -118,8 +156,15 @@ pg_cron（DB内部）が無料枠での正解。
         cronジョブID2で毎日14:30 UTC点検。初回 ok=true / issues={} /
         **videos_count=142,844 == mv_count=142,844（MV完全同期＝凍結完治を確認）** / latest_snapshot=06-02。
         （system_healthテーブル＝anon公開。22MV/9関数の存在・収集鮮度(3日)・MV凍結(件数乖離5%)を点検）
-     ① collector: リフレッシュ/収集失敗で exit 1 + GitHub Actions通知（未）
-     ② frontend: 「最終更新」を収集ログ時刻でなく system_health/実データ鮮度に（未）
+     ① ✅ **collector: リフレッシュ失敗で exit 1 実装済み**（2026-06-03）
+        - `supabase_client.py`: `refresh_materialized_views` が `list[str]`（失敗グループ名）を返すよう変更
+        - `main.py`: Group1/1b（スナップショット基盤）失敗時のみ `sys.exit(1)`
+          Group2-6 失敗は WARNING ログのみ（pg_cron が 14:00 UTC に全量更新するため）
+        - GitHub Actions は exit 1 でジョブを失敗扱いにし、自動メール通知が発動する
+     ② ✅ **frontend: 「最終更新」を system_health の実データ鮮度に変更済み**（2026-06-03）
+        - `App.tsx`: `system_health.latest_snapshot`（実際のデータ収集日）を優先表示
+        - 健全性インジケーター追加：ok=true → 緑 ✓、ok=false → 黄 ⚠（ホバーで問題詳細）
+        - system_health が空の場合は collection_log にフォールバック（後方互換）
 - Tier2: ④削除のpg_cron化+容量監視(無料500MB) ⑤全SQL冪等化+順序運用 ⑥リフレッシュ経路をpg_cronに一本化(collectorの重い物削除)。
 - Tier3: ⑦APIキー失効検知 ⑧CLAUDE.md実態反映 ⑨外部依存メモ(キー/quota/GH Actions 60日無活動停止/Supabase一時停止)。
 - ※Phase 2(国別事前計算MV)はこの安定化と並行 or 後。ユーザー指示待ち。
@@ -297,20 +342,33 @@ groups = [
 
 ## 次のセッションでやること
 
-### 0. 🔴 `sql/migrate_fix_refresh_timeout.sql` を Supabase SQL Editor で実行（最優先）
-   - 「総動画数が約1ヶ月増えない」問題の修正
-   - STEP1（ALTER FUNCTION）→ STEP2（手動リフレッシュ）→ STEP3（件数確認）の順で1ファイルを Run
-   - STEP3 で `mv_snapshot_count` が `videos_table_count` に追いついていれば復旧
-   - 以降は日次 cron（08:00 UTC）でMVが更新され続けるか、翌日 collection_log とあわせて確認
+### 🚀 Turso 移行 Phase 2（最優先）
 
-### 1. `sql/migrate_precompute_video_types.sql` を Supabase SQL Editor で実行
-   - ファイル内容を全コピペして Run
-   - 「Success. No rows returned」が出ればOK
-   - エラーが出た場合はエラー内容をClaude Codeに共有
+**1. `turso/sync.py` を実行してデータを Turso に移行する**
+```bash
+cd yt-niche-analyzer
+pip install supabase libsql-client
+SUPABASE_URL=<...> SUPABASE_SERVICE_ROLE_KEY=<...> \
+TURSO_DATABASE_URL=<...> TURSO_AUTH_TOKEN=<...> \
+python turso/sync.py
+```
+- 完了ログ「=== Migration complete ===」が出れば OK
+- 所要時間目安: 15〜30分
+- 再実行は安全（INSERT OR REPLACE）
 
-### 2. ダッシュボードで video_type=short に切り替えて全チャート確認
-   - 全チャートがタイムアウトなしで表示されれば完了
+**2. GitHub Actions に TURSO_DATABASE_URL / TURSO_AUTH_TOKEN を追加**（Secret 登録済みなら skip）
+- `.github/workflows/collect.yml` の `env:` ブロックに2つを追加:
+  ```yaml
+  TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+  TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+  ```
+- 次の collect 実行で dual-write が開始する
 
-### 3. 未完成の対応（SQLが正常実行された後）
-   - video_type=short/normal での動作確認
-   - 必要なら BuzzPickup の video_type フィルタ確認（現在はクライアント側フィルタ）
+**3. フロントエンドの Turso 接続設定**
+- `@libsql/client` npm パッケージを追加
+- Turso HTTP API で `fn_topic_summary` 相当の SQLite クエリを実装
+- まず topic_summary → KPI カードの動作確認
+
+### Supabase 関連（移行完了まで継続運用）
+- pg_cron refresh は移行完了後に廃止予定（Turso はその場計算で MV 不要）
+- 旧タスク（migrate_precompute_video_types.sql 等）は **Turso 移行が完了したら不要になる**ため凍結

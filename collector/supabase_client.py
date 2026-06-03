@@ -130,16 +130,12 @@ def cleanup_old_snapshots(client: Client):
         )
 
 
-def refresh_materialized_views(client: Client):
+def refresh_materialized_views(client: Client) -> list[str]:
     """マテリアライズドビューをリフレッシュ（クエリ高速化）
 
-    3グループに分割して順番に呼び出す。
-    Supabase Free プランの8秒タイムアウト対策として、
-    各グループが独立したRPCコール（独立したタイムアウト枠）になる。
-
-    Group 1: snapshot base (mv_latest_video/channel_snapshot)
-    Group 2: derived MVs (video_tags, video_topics, video_ranking, etc.)
-    Group 3: analytics MVs (keyword, ai_penetration, topic_overlap, etc.)
+    失敗したグループのラベル一覧を返す。
+    Group1/1b（スナップショット基盤）は critical — 失敗すると dashboard データが古くなる。
+    Group2-6 は pg_cron が 14:00 UTC に全量更新するため best-effort 扱い。
     """
     groups = [
         ("refresh_snapshot_base",    "Group1: snapshot base"),
@@ -150,9 +146,12 @@ def refresh_materialized_views(client: Client):
         ("refresh_type_overlap_mvs", "Group5: type overlap MVs"),
         ("refresh_type_keyword_mvs", "Group6: type keyword MVs"),
     ]
+    failed: list[str] = []
     for rpc_name, label in groups:
         try:
             client.rpc(rpc_name, {}).execute()
             logger.info(f"Materialized views refreshed: {label}")
         except Exception as e:
             logger.warning(f"refresh failed [{label}]: {e}")
+            failed.append(label)
+    return failed
