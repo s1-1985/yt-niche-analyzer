@@ -97,8 +97,15 @@ pg_cron（DB内部）が無料枠での正解。
 - CLAUDE.md が乖離：「86k動画/MV4個」→ 実際 140k/**MV22個**。
 
 **安定化ロードマップ（着手順）**：
-- A. `cleanup_old_snapshots` のDB実在確認（`SELECT proname FROM pg_proc WHERE proname='cleanup_old_snapshots';`）。無ければ最優先対処。
-- Tier1（静かな障害をなくす）: ①失敗でexit 1+Actions通知 ②「最終更新」を実データ鮮度に ③doctor(MV/関数/鮮度を毎日pg_cron点検)。
+- A. ✅ `cleanup_old_snapshots` はDBに**実在確認済み**（2026-06-03）→ 削除処理は生きている。
+     ただしプロジェクトは約1ヶ月で365日保持の削除はまだ未発動＝容量は~2027-05まで増加後プラトー。
+     **要確認: Supabase DashboardでDB現容量（無料500MB枠への余裕）**。
+- Tier1（静かな障害をなくす）:
+     ③ ✅ **doctor作成済み・適用待ち** `sql/migrate_health_check.sql`
+        （system_healthテーブル＋run_health_check()＝22MV/9関数の存在・収集鮮度(3日)・MV凍結(件数乖離5%)を
+         毎日14:30 UTC点検しanon公開記録）。適用後 `SELECT run_health_check();` で即確認可。
+     ① collector: リフレッシュ/収集失敗で exit 1 + GitHub Actions通知（未）
+     ② frontend: 「最終更新」を収集ログ時刻でなく system_health/実データ鮮度に（未）
 - Tier2: ④削除のpg_cron化+容量監視(無料500MB) ⑤全SQL冪等化+順序運用 ⑥リフレッシュ経路をpg_cronに一本化(collectorの重い物削除)。
 - Tier3: ⑦APIキー失効検知 ⑧CLAUDE.md実態反映 ⑨外部依存メモ(キー/quota/GH Actions 60日無活動停止/Supabase一時停止)。
 - ※Phase 2(国別事前計算MV)はこの安定化と並行 or 後。ユーザー指示待ち。
