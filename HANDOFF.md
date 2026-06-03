@@ -318,20 +318,37 @@ groups = [
 
 ## 次のセッションでやること
 
-### 0. 🔴 `sql/migrate_fix_refresh_timeout.sql` を Supabase SQL Editor で実行（最優先）
-   - 「総動画数が約1ヶ月増えない」問題の修正
-   - STEP1（ALTER FUNCTION）→ STEP2（手動リフレッシュ）→ STEP3（件数確認）の順で1ファイルを Run
-   - STEP3 で `mv_snapshot_count` が `videos_table_count` に追いついていれば復旧
-   - 以降は日次 cron（08:00 UTC）でMVが更新され続けるか、翌日 collection_log とあわせて確認
+> ⚠️⚠️ **2026-06-03 大方針転換 — 必読**: Supabase無料500MBを容量超過(実測605MB)。
+> 重い集計用のMV(22個)を貯める容量が無料枠に無いと判明（catch-22）。
+> **→ Turso(LibSQL/SQLite, 無料9GB)へ移行することを決定**。スパイクで「生データ+オンザフライ計算」が
+> 実測1〜2秒で耐えると確認済（**MVは全廃**）。詳細は上の「🔴🔴【緊急】DB容量」「Turso移行」セクション。
+> **このファイル内の"古いSupabase用タスク(migrate_*.sql適用 / pg_cron / doctor / 国別事前計算 等)は全て破棄。
+> 適用も実行もしないこと。** Supabaseは切替まで生かすだけ（新規変更しない）。
+> モデルはSonnet 4.6でも可（実装中心のため。微妙な突合せ/デバッグ時のみOpus推奨）。
 
-### 1. `sql/migrate_precompute_video_types.sql` を Supabase SQL Editor で実行
-   - ファイル内容を全コピペして Run
-   - 「Success. No rows returned」が出ればOK
-   - エラーが出た場合はエラー内容をClaude Codeに共有
+### 現状（Phase 0 完了 = GO）
+- Turso DB作成済: `yt-niche`（東京/ap-northeast-1）、URL=`libsql://yt-niche-s1-1985.aws-ap-northeast-1.turso.io`
+- GitHub secret登録済: `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`（full-access）
+- スパイク実測OK: 最重タグ集計1.9s / 国フィルタ0.8s / 生データ62MB。Tursoは8秒制限無で余裕。
+- Supabaseは並行運転で生かしたまま（ダッシュボードは切替まで止めない）
 
-### 2. ダッシュボードで video_type=short に切り替えて全チャート確認
-   - 全チャートがタイムアウトなしで表示されれば完了
+### Phase 1（次の着手）= SQLiteスキーマ + 収集側Turso対応
+1. **SQLiteスキーマDDL設計**: `sql/setup.sql` を基に正規化。配列(`videos.topic_ids/tags`, `channels.topic_ids`)を
+   junctionテーブル(`video_topics`,`video_tags`,`channel_topics`)へ。基本表: topics/channels/videos/
+   video_snapshots/channel_snapshots/collection_log。＋（任意）少数の「既定ビュー」テーブル(初期表示の一瞬さ用)。
+2. **データ同期**: Supabase→Turso へ既存データ移送（GitHub Action or スクリプト。Turso secret使用）。
+3. **collector を Turso書き込み対応**: python libsql client。当面Supabaseと両書き(並行運転)。
 
-### 3. 未完成の対応（SQLが正常実行された後）
-   - video_type=short/normal での動作確認
-   - 必要なら BuzzPickup の video_type フィルタ確認（現在はクライアント側フィルタ）
+### Phase 2: フロントを libSQL 化
+- `@supabase/supabase-js` → `@libsql/client`。`useFilteredQuery` と各チャートのクエリをSQL化(オンザフライ)。
+- フロント用に **read-only トークン**を別途発行(Turso "Create Token")しビルドsecretへ。
+
+### Phase 3: 突合せ→切替
+- SupabaseとTursoで主要数値(総動画数/各KPI)一致を確認してから本番をTursoへ切替。
+
+### Phase 4: 旧構成撤去
+- Supabaseの22MV/pg_cron/RPC、collectorのSupabase書き込み、`sql/`の旧migrateを撤去。`CLAUDE.md`を実態(Turso)に更新。
+
+### メモ
+- `CLAUDE.md` の記載(86k動画/MV4個/Supabase前提)は古い。移行完了(Phase4)で書き換える。
+- スパイクスクリプトは `/tmp/spike.py`（使い捨て・未コミット）。結果は上のTursoセクションに記録済。
