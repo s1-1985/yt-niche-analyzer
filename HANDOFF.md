@@ -124,6 +124,16 @@ pg_cron（DB内部）が無料枠での正解。
        「オンザフライ可否」判定(可なら事前計算最小化)。Turso認証不要で先行可。
      - ユーザー作業: PCでTursoアカウント+DB作成→secret TURSO_DATABASE_URL/TURSO_AUTH_TOKEN追加(トークンchat非掲載)。
      - Phase: 0スパイク→1 SQLiteスキーマ+収集側改修(並行)→2フロントlibSQL化→3 Supabase突合せ切替→4旧構成撤去。
+     - ✅ **Phase0スパイク完了(2026-06-03)＝GO**。ローカルSQLite・合成データ(14万動画/85万タグ/21万topic紐付)で実測:
+       最重(全ジャンル×タグ上位10・フィルタ無=全85万タグ走査)=**1.9s** / 国=JP=0.78s / JP+90d+short=0.26s /
+       topic_summary既定=0.73s・フィルタ=0.14s。**Supabaseで~30秒だった国フィルタタグ集計が0.8秒**。
+       生データDB=**62MB**(605MBはMVで膨張してただけ)。**→オンザフライで耐える＝MV全廃を確定**。
+       Turso実機は東京region+数十msネットワークのみ、8秒制限無で余裕。
+     - 確定アーキ: Tursoに生データ正規化(topics/channels/videos/video_topics/video_tags/snapshots)+ごく少数の
+       「既定ビュー」テーブルを収集時生成(初期表示の一瞬さ用)。フィルタ時は全部オンザフライ。pg_cron/22MV不要。
+     - Tursoセットアップ済: DB=yt-niche(ap-northeast-1/東京)、URL=libsql://yt-niche-s1-1985.aws-ap-northeast-1.turso.io、
+       secret登録済(TURSO_DATABASE_URL/TURSO_AUTH_TOKEN)。ブラウザ"Edit Data"タブでSQL実行可/"Download SQLite File"で取得可。
+     - Supabase現状: 606MB超過警告継続(移行で解消予定)。死蔵mv_outlier_channelsは未削除(移行で全廃されるので放置可)。
 - Tier1（静かな障害をなくす）:
      ③ ✅ **doctor適用済み・初回オールグリーン**（2026-06-03 02:09）`sql/migrate_health_check.sql`
         cronジョブID2で毎日14:30 UTC点検。初回 ok=true / issues={} /
