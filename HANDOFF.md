@@ -98,12 +98,26 @@ pg_cron（DB内部）が無料枠での正解。
 
 **安定化ロードマップ（着手順）**：
 - A. ✅ `cleanup_old_snapshots` はDBに**実在確認済み**（2026-06-03）→ 削除処理は生きている。
-     ただしプロジェクトは約1ヶ月で365日保持の削除はまだ未発動＝容量は~2027-05まで増加後プラトー。
-     **要確認: Supabase DashboardでDB現容量（無料500MB枠への余裕）**。
+- 🔴🔴 **【緊急】DB容量が無料枠超過（2026-06-03 確認）**: `pg_database_size` = **605MB > 500MB上限**。
+     - **主因はMV**（再生成可能なキャッシュ）: mv_video_tags 160MB / mv_video_ranking 64MB /
+       mv_video_topics 43MB … 上位だけで350MB超。本物のデータ(videos96+snapshots48+44+channels33≒220MB)は軽い。
+     - ※mv_outlier_channels(12MB) は doctor の22MVリストに無い＝MVがさらに存在(drift)。
+     - **将来の別問題**: video/channel_snapshots は今92MBだが365日保持で1年後~600MBまで増える→保持短縮(90日)が必要。
+     - **対策順**: (1)全MVサイズ一覧で不要MV特定→削除 (2)14:00 UTCの非CONCURRENT全更新でbloat回収し再計測
+       (3)snapshot保持365→90日 (4)なお超過ならPro/範囲縮小。MVは消しても実データ無傷。
+     - 教訓: 「無料×全部MVで爆速×データ増加」の三立は構造的に困難。容量は継続監視必須。
+     - ⚠️ **bloat仮説は否定（2026-06-03）**: mv_video_tags を REFRESH しても 160MB のまま＝**本物のサイズ**。
+       しかも REFRESH 中に一時コピーで db が 605→**766MB** に増加（数分で戻る見込み／戻らねばVACUUM FULL）。
+       → リフレッシュ/小細工では容量は減らせないと確定。**他MVのREFRESHは一時膨張するので不可**。
+     - mv_video_tags は fn_keyword_*/fn_topic_popular_tags 等が実行時参照＝**削除不可**。frontは全てRPC経由(MV直読みなし)。
+     - mv_outlier_channels(12MB) は参照ゼロ＝**安全に削除可**（確定の小さな勝ち）。
+     - **意思決定待ち**: A) Pro $25/月(8GB・全部解決) か B) 無料死守でデータ削減(実データ喪失＋継続運用)。
+       忌憚なき推奨=A(壁は再来するため)。ユーザー判断待ち。Bなら不要MV削除＋動画間引き＋保持短縮を設計。
 - Tier1（静かな障害をなくす）:
-     ③ ✅ **doctor作成済み・適用待ち** `sql/migrate_health_check.sql`
-        （system_healthテーブル＋run_health_check()＝22MV/9関数の存在・収集鮮度(3日)・MV凍結(件数乖離5%)を
-         毎日14:30 UTC点検しanon公開記録）。適用後 `SELECT run_health_check();` で即確認可。
+     ③ ✅ **doctor適用済み・初回オールグリーン**（2026-06-03 02:09）`sql/migrate_health_check.sql`
+        cronジョブID2で毎日14:30 UTC点検。初回 ok=true / issues={} /
+        **videos_count=142,844 == mv_count=142,844（MV完全同期＝凍結完治を確認）** / latest_snapshot=06-02。
+        （system_healthテーブル＝anon公開。22MV/9関数の存在・収集鮮度(3日)・MV凍結(件数乖離5%)を点検）
      ① collector: リフレッシュ/収集失敗で exit 1 + GitHub Actions通知（未）
      ② frontend: 「最終更新」を収集ログ時刻でなく system_health/実データ鮮度に（未）
 - Tier2: ④削除のpg_cron化+容量監視(無料500MB) ⑤全SQL冪等化+順序運用 ⑥リフレッシュ経路をpg_cronに一本化(collectorの重い物削除)。
