@@ -1,14 +1,13 @@
-name: Collect YouTube Data
+name: Turso Migration (one-time)
 
 on:
-  schedule:
-    - cron: '0 8 * * *'   # 毎日 08:00 UTC = 17:00 JST
-  workflow_dispatch:        # 手動実行も可能
+  workflow_dispatch:   # GitHub Actions 画面の「Run workflow」ボタンで手動実行
 
 jobs:
-  collect:
+  migrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60   # データ量次第で15〜30分。余裕を持って60分
+
     steps:
       - uses: actions/checkout@v4
 
@@ -18,14 +17,12 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r collector/requirements.txt
+        run: pip install supabase libsql-client
 
-      - name: Run collector
+      - name: Run migration
         env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-        working-directory: collector
-        run: python main.py
+        run: python turso/sync.py
