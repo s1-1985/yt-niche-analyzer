@@ -44,6 +44,8 @@
 - `collector/requirements.txt` — `libsql-client>=0.3.0` 追加
 - **PR #63 マージ済み**: `libsql://` → `https://` URL 変換バグ修正 + `_batch()`/`_run()` での Statement ラッピング修正
   （この修正がないと Turso Migration ワークフローが WSS 400 エラーで失敗する）
+- **PR #64 マージ済み**: `PRAGMA foreign_keys = OFF` を sync.py と turso_client.py に追加
+  （channels.topic_ids に topics テーブル外の YouTube ID が含まれるため FK 制約違反が発生していた）
 
 ### Phase 2（次：フロントエンドの Turso クエリ移行）
 - フロントエンドの RPC 呼び出しを Supabase から Turso HTTP API 直クエリに切り替え
