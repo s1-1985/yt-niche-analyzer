@@ -36,12 +36,14 @@
 - Turso DB 作成済み
 - GitHub Secrets 登録済み: `TURSO_AUTH_TOKEN` / `TURSO_DATABASE_URL`
 
-### Phase 1 完了（本セッション 2026-06-03）✅ **main にマージ済み**
+### Phase 1 完了（本セッション 2026-06-03）✅ **main にマージ済み（PR #62 + #63）**
 - `turso/schema.sql` — SQLite スキーマ（配列→junction テーブル正規化・インデックス付き）
 - `turso/sync.py` — Supabase → Turso 一回限り移行パイプライン（90日スナップ）
 - `collector/turso_client.py` — Turso 書き込みクライアント
 - `collector/main.py` — dual-write 対応（Turso 失敗は non-critical）
 - `collector/requirements.txt` — `libsql-client>=0.3.0` 追加
+- **PR #63 マージ済み**: `libsql://` → `https://` URL 変換バグ修正 + `_batch()`/`_run()` での Statement ラッピング修正
+  （この修正がないと Turso Migration ワークフローが WSS 400 エラーで失敗する）
 
 ### Phase 2（次：フロントエンドの Turso クエリ移行）
 - フロントエンドの RPC 呼び出しを Supabase から Turso HTTP API 直クエリに切り替え
@@ -344,27 +346,16 @@ groups = [
 
 ### 🚀 Turso 移行 Phase 2（最優先）
 
-**1. `turso/sync.py` を実行してデータを Turso に移行する**
-```bash
-cd yt-niche-analyzer
-pip install supabase libsql-client
-SUPABASE_URL=<...> SUPABASE_SERVICE_ROLE_KEY=<...> \
-TURSO_DATABASE_URL=<...> TURSO_AUTH_TOKEN=<...> \
-python turso/sync.py
-```
+**⚠️ 事前確認: PR #63 マージ済み（2026-06-03）= 接続バグ修正済み**
+
+**1. `Turso Migration (one-time)` GitHub Actions ワークフローを手動実行する**
+- GitHub → Actions → "Turso Migration (one-time)" → "Run workflow" ボタン
 - 完了ログ「=== Migration complete ===」が出れば OK
 - 所要時間目安: 15〜30分
-- 再実行は安全（INSERT OR REPLACE）
+- 再実行は安全（INSERT OR REPLACE / INSERT OR IGNORE）
+- 成功すれば Turso に 140k+ 動画・46k+ チャンネルがコピーされる
 
-**2. GitHub Actions に TURSO_DATABASE_URL / TURSO_AUTH_TOKEN を追加**（Secret 登録済みなら skip）
-- `.github/workflows/collect.yml` の `env:` ブロックに2つを追加:
-  ```yaml
-  TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-  TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-  ```
-- 次の collect 実行で dual-write が開始する
-
-**3. フロントエンドの Turso 接続設定**
+**2. フロントエンドの Turso 接続設定**
 - `@libsql/client` npm パッケージを追加
 - Turso HTTP API で `fn_topic_summary` 相当の SQLite クエリを実装
 - まず topic_summary → KPI カードの動作確認

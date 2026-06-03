@@ -217,6 +217,7 @@ def main() -> None:
     try:
         logger.info("=== Turso migration start ===")
         apply_schema(tc)
+        tc.execute("PRAGMA foreign_keys = OFF")
         sync_topics(sb, tc)
         sync_channels(sb, tc)
         sync_videos(sb, tc)
