@@ -17,7 +17,10 @@ def init_turso_client(url: str, auth_token: str):
     import libsql_client  # type: ignore
     # libsql:// は WebSocket(WSS)を使い 400 になるため https:// に変換して HTTP API を使う
     http_url = url.replace("libsql://", "https://")
-    return libsql_client.create_client_sync(url=http_url, auth_token=auth_token)
+    client = libsql_client.create_client_sync(url=http_url, auth_token=auth_token)
+    # topic_ids にキュレーション済み topics テーブル外の ID が含まれるため FK チェックを無効化
+    client.execute("PRAGMA foreign_keys = OFF")
+    return client
 
 
 def _batch(client, stmts: list) -> None:
