@@ -15,13 +15,20 @@ _BATCH_SIZE = 200  # 1 回の HTTP リクエストに含める SQL 文数
 def init_turso_client(url: str, auth_token: str):
     """Turso (LibSQL) 同期クライアントを初期化する。"""
     import libsql_client  # type: ignore
-    return libsql_client.create_client_sync(url=url, auth_token=auth_token)
+    # libsql:// は WebSocket(WSS)を使い 400 になるため https:// に変換して HTTP API を使う
+    http_url = url.replace("libsql://", "https://")
+    return libsql_client.create_client_sync(url=http_url, auth_token=auth_token)
 
 
 def _batch(client, stmts: list) -> None:
     """stmts を _BATCH_SIZE ずつに分割して client.batch() で送信する。"""
+    import libsql_client  # type: ignore
     for i in range(0, len(stmts), _BATCH_SIZE):
-        client.batch(stmts[i : i + _BATCH_SIZE])
+        chunk = [
+            libsql_client.Statement(s[0], s[1]) if isinstance(s, tuple) else s
+            for s in stmts[i : i + _BATCH_SIZE]
+        ]
+        client.batch(chunk)
 
 
 def upsert_channels_turso(client, channels: list[dict]) -> int:
@@ -105,13 +112,14 @@ def log_collection_turso(client, topic_id: str,
                           videos_collected: int, channels_collected: int,
                           quota_used: int) -> None:
     """収集結果を collection_log に記録する。"""
+    import libsql_client  # type: ignore
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     try:
-        client.execute(
+        client.execute(libsql_client.Statement(
             "INSERT INTO collection_log"
             " (topic_id, collected_at, videos_collected, channels_collected, quota_used)"
             " VALUES (?, ?, ?, ?, ?)",
             [topic_id, now, videos_collected, channels_collected, quota_used],
-        )
+        ))
     except Exception as e:
         logger.warning(f"Turso: log_collection failed: {e}")
