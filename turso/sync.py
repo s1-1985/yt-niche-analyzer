@@ -52,8 +52,13 @@ def _paginate(sb, table: str, select: str = "*", extra=None):
 
 
 def _run(client, stmts: list) -> None:
+    import libsql_client  # type: ignore
     for i in range(0, len(stmts), BATCH):
-        client.batch(stmts[i : i + BATCH])
+        chunk = [
+            libsql_client.Statement(s[0], s[1]) if isinstance(s, tuple) else s
+            for s in stmts[i : i + BATCH]
+        ]
+        client.batch(chunk)
 
 
 # ── schema ────────────────────────────────────────────────────
@@ -205,7 +210,9 @@ def main() -> None:
     import libsql_client  # type: ignore
 
     sb = create_client(supabase_url, supabase_key)
-    tc = libsql_client.create_client_sync(url=turso_url, auth_token=turso_token)
+    # libsql:// は WebSocket(WSS)を使い 400 エラーになるため https:// に変換して HTTP API を使う
+    http_url = turso_url.replace("libsql://", "https://")
+    tc = libsql_client.create_client_sync(url=http_url, auth_token=turso_token)
 
     try:
         logger.info("=== Turso migration start ===")
