@@ -111,8 +111,19 @@ pg_cron（DB内部）が無料枠での正解。
        → リフレッシュ/小細工では容量は減らせないと確定。**他MVのREFRESHは一時膨張するので不可**。
      - mv_video_tags は fn_keyword_*/fn_topic_popular_tags 等が実行時参照＝**削除不可**。frontは全てRPC経由(MV直読みなし)。
      - mv_outlier_channels(12MB) は参照ゼロ＝**安全に削除可**（確定の小さな勝ち）。
-     - **意思決定待ち**: A) Pro $25/月(8GB・全部解決) か B) 無料死守でデータ削減(実データ喪失＋継続運用)。
-       忌憚なき推奨=A(壁は再来するため)。ユーザー判断待ち。Bなら不要MV削除＋動画間引き＋保持短縮を設計。
+     - ✅ **決定(2026-06-03): Turso(LibSQL/SQLite)へ移行**。無料9GB＋SQLでフィルタ維持＝容量・タイムアウト両解決。
+     - 🔑 **設計の核心**: TursoにはSupabase無料の8秒制限が無い→**22MVを再現する必要なし**。生データ＋少数の
+       基礎ロールアップを置き、重い集計は**オンザフライ計算**（SQLite高速・タイムアウト無）。最重い既定値だけ事前計算。
+       →移行は"移設"でなく**大幅簡素化**（22MV+pg_cron+drift地獄が消える）。
+     - データモデル変更: SQLiteに配列型なし→ videos.topic_ids[]/tags[], channels.topic_ids[] を
+       junctionテーブル(video_topics, video_tags, channel_topics)へ正規化。
+     - フロントのデータ要求(調査済): 既定はテーブル直読み/フィルタ時はfn_*(p_min_date,p_video_type,p_country)。
+       13分析ビュー+ドリルダウン(video_ranking/channel_ranking topicId)+trend/buzz/country一覧。
+       フィルタ軸=period(5)×video_type(3)×country(50+)。※全組合せ事前計算(750+)はやらない→オンザフライ。
+     - 進め方: 安全のためSupabase並行運転。Phase0スパイク=ローカルSQLiteで**最重いタグ集計+国フィルタの速度**を実測し
+       「オンザフライ可否」判定(可なら事前計算最小化)。Turso認証不要で先行可。
+     - ユーザー作業: PCでTursoアカウント+DB作成→secret TURSO_DATABASE_URL/TURSO_AUTH_TOKEN追加(トークンchat非掲載)。
+     - Phase: 0スパイク→1 SQLiteスキーマ+収集側改修(並行)→2フロントlibSQL化→3 Supabase突合せ切替→4旧構成撤去。
 - Tier1（静かな障害をなくす）:
      ③ ✅ **doctor適用済み・初回オールグリーン**（2026-06-03 02:09）`sql/migrate_health_check.sql`
         cronジョブID2で毎日14:30 UTC点検。初回 ok=true / issues={} /
