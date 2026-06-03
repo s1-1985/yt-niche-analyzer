@@ -83,6 +83,26 @@ B適用後・A修正後に同じ方法で再テストして200を確認する。
 【教訓の更新】重いMVは「収集後にコレクターRPCで更新」だとクライアント120秒で失敗する。
 pg_cron（DB内部）が無料枠での正解。
 
+### 🔵 安定稼働 実地監査の結果とロードマップ（2026-06-03）
+「永続稼働」目的でコード全体を監査。最大の弱点は性能でなく**運用**（静かな障害／手作業SQLのdrift／安全装置の未検証）。
+
+監査で判明した事実：
+- MVリフレッシュ失敗時、collectorは警告のみで**exit 1しない**（supabase_client.py:154-158）→ Actions「成功」扱い→1ヶ月気づかず。
+- GitHub Actions collect.yml に失敗通知なし。cron は 08:00 UTC。
+- UIの「最終更新」(App.tsx:76-84)は collection_log の時刻で、MV更新成否は見ていない（古くても新しく見える）。
+- スナップショット削除は**実装あり**(supabase_client.py:99-130, 365日保持)だが、RPC `cleanup_old_snapshots` がDBに無ければ静かに無削除→**要生存確認**。
+- SQL: 全34ファイル、マイグレーション順序管理なし。22MV中12個が `IF NOT EXISTS` 無しで再実行不可。health check無し。
+- collector は今も7つの refresh_* をRPC呼び出し中（pg_cron適用後は重複→重い物は削除して一本化すべき）。
+- APIキー失効は未検知（quota超過のみ検知）。
+- CLAUDE.md が乖離：「86k動画/MV4個」→ 実際 140k/**MV22個**。
+
+**安定化ロードマップ（着手順）**：
+- A. `cleanup_old_snapshots` のDB実在確認（`SELECT proname FROM pg_proc WHERE proname='cleanup_old_snapshots';`）。無ければ最優先対処。
+- Tier1（静かな障害をなくす）: ①失敗でexit 1+Actions通知 ②「最終更新」を実データ鮮度に ③doctor(MV/関数/鮮度を毎日pg_cron点検)。
+- Tier2: ④削除のpg_cron化+容量監視(無料500MB) ⑤全SQL冪等化+順序運用 ⑥リフレッシュ経路をpg_cronに一本化(collectorの重い物削除)。
+- Tier3: ⑦APIキー失効検知 ⑧CLAUDE.md実態反映 ⑨外部依存メモ(キー/quota/GH Actions 60日無活動停止/Supabase一時停止)。
+- ※Phase 2(国別事前計算MV)はこの安定化と並行 or 後。ユーザー指示待ち。
+
 ---
 
 ## 🔴 最優先（2026-06-02 調査）— 総動画数が約1ヶ月増えない問題
