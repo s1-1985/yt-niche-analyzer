@@ -14,6 +14,7 @@ import sys
 
 from youtube_client import YouTubeClient, QuotaExceededError
 from supabase_client import init_client, upsert_channels, upsert_videos, cleanup_old_snapshots, refresh_materialized_views
+from turso_client import init_turso_client, upsert_channels_turso, upsert_videos_turso, log_collection_turso
 from rotation import get_today_topics, log_collection, DAILY_QUOTA_LIMIT, QUOTA_PER_TOPIC
 from metrics import compute_collection_stats
 from topic_ids import TOPIC_IDS
@@ -38,6 +39,17 @@ def main():
     # クライアント初期化
     yt = YouTubeClient(youtube_api_key)
     sb = init_client(supabase_url, supabase_key)
+
+    # Turso クライアント（オプション。env 未設定なら None = Turso 書き込みスキップ）
+    turso_url   = os.environ.get("TURSO_DATABASE_URL")
+    turso_token = os.environ.get("TURSO_AUTH_TOKEN")
+    tb = None
+    if turso_url and turso_token:
+        try:
+            tb = init_turso_client(turso_url, turso_token)
+            logger.info("Turso client initialized (dual-write enabled)")
+        except Exception as e:
+            logger.warning(f"Turso client init failed (continuing Supabase-only): {e}")
 
     # 全トピックを最終収集日が古い順に取得
     today_topics = get_today_topics(sb)
@@ -118,12 +130,25 @@ def main():
         n_channels = upsert_channels(sb, channels)
         n_videos = upsert_videos(sb, videos)
 
+        # Turso dual-write（non-critical: 失敗してもコレクター全体は継続）
+        if tb:
+            try:
+                upsert_channels_turso(tb, channels)
+                upsert_videos_turso(tb, videos)
+            except Exception as e:
+                logger.warning(f"Turso write failed (Supabase write succeeded): {e}")
+
         total_videos += n_videos
         total_channels += n_channels
         topics_processed += 1
 
         # 6. 収集ログ記録
         log_collection(sb, topic_id, n_videos, n_channels, yt.quota_used)
+        if tb:
+            try:
+                log_collection_turso(tb, topic_id, n_videos, n_channels, yt.quota_used)
+            except Exception as e:
+                logger.warning(f"Turso log_collection failed: {e}")
 
         # 統計表示
         stats = compute_collection_stats(videos, channels)
