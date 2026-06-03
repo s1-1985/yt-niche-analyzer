@@ -36,7 +36,7 @@
 - Turso DB 作成済み
 - GitHub Secrets 登録済み: `TURSO_AUTH_TOKEN` / `TURSO_DATABASE_URL`
 
-### Phase 1 完了（本セッション 2026-06-03）✅
+### Phase 1 完了（本セッション 2026-06-03）✅ **main にマージ済み**
 - `turso/schema.sql` — SQLite スキーマ（配列→junction テーブル正規化・インデックス付き）
 - `turso/sync.py` — Supabase → Turso 一回限り移行パイプライン（90日スナップ）
 - `collector/turso_client.py` — Turso 書き込みクライアント
