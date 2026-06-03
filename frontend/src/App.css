@@ -860,6 +860,9 @@ tbody tr:hover {
   color: var(--text-muted);
 }
 
+.health-ok { color: #10b981; }
+.health-warn { color: #f59e0b; }
+
 .history-btn {
   background: none;
   border: 1px solid var(--border);

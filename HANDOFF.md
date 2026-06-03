@@ -8,7 +8,7 @@
 ---
 
 ## 現在のブランチ
-`claude/hopeful-babbage-g5QTg`
+`claude/intelligent-knuth-oewMv`
 
 ---
 
@@ -118,8 +118,15 @@ pg_cron（DB内部）が無料枠での正解。
         cronジョブID2で毎日14:30 UTC点検。初回 ok=true / issues={} /
         **videos_count=142,844 == mv_count=142,844（MV完全同期＝凍結完治を確認）** / latest_snapshot=06-02。
         （system_healthテーブル＝anon公開。22MV/9関数の存在・収集鮮度(3日)・MV凍結(件数乖離5%)を点検）
-     ① collector: リフレッシュ/収集失敗で exit 1 + GitHub Actions通知（未）
-     ② frontend: 「最終更新」を収集ログ時刻でなく system_health/実データ鮮度に（未）
+     ① ✅ **collector: リフレッシュ失敗で exit 1 実装済み**（2026-06-03）
+        - `supabase_client.py`: `refresh_materialized_views` が `list[str]`（失敗グループ名）を返すよう変更
+        - `main.py`: Group1/1b（スナップショット基盤）失敗時のみ `sys.exit(1)`
+          Group2-6 失敗は WARNING ログのみ（pg_cron が 14:00 UTC に全量更新するため）
+        - GitHub Actions は exit 1 でジョブを失敗扱いにし、自動メール通知が発動する
+     ② ✅ **frontend: 「最終更新」を system_health の実データ鮮度に変更済み**（2026-06-03）
+        - `App.tsx`: `system_health.latest_snapshot`（実際のデータ収集日）を優先表示
+        - 健全性インジケーター追加：ok=true → 緑 ✓、ok=false → 黄 ⚠（ホバーで問題詳細）
+        - system_health が空の場合は collection_log にフォールバック（後方互換）
 - Tier2: ④削除のpg_cron化+容量監視(無料500MB) ⑤全SQL冪等化+順序運用 ⑥リフレッシュ経路をpg_cronに一本化(collectorの重い物削除)。
 - Tier3: ⑦APIキー失効検知 ⑧CLAUDE.md実態反映 ⑨外部依存メモ(キー/quota/GH Actions 60日無活動停止/Supabase一時停止)。
 - ※Phase 2(国別事前計算MV)はこの安定化と並行 or 後。ユーザー指示待ち。
@@ -297,7 +304,13 @@ groups = [
 
 ## 次のセッションでやること
 
-### 0. 🔴 `sql/migrate_fix_refresh_timeout.sql` を Supabase SQL Editor で実行（最優先）
+### 0. 🔴 **[ユーザー手動]** `sql/migrate_pgcron_refresh.sql` を Supabase SQL Editor で実行
+   - pg_cron 有効化 + `refresh_all_mvs()` 関数作成 + 毎日 14:00 UTC スケジュール
+   - 権限エラーなら先に Dashboard → Database → Extensions → pg_cron を有効化してから再実行
+   - 適用後、翌日 14:30 UTC の system_health で ok=true / issues={} を確認
+   - ✅ 確認できたら Tier2 ⑥（コレクターの重いリフレッシュ削除）に進む
+
+### 🔴 `sql/migrate_fix_refresh_timeout.sql` を Supabase SQL Editor で実行（旧最優先）
    - 「総動画数が約1ヶ月増えない」問題の修正
    - STEP1（ALTER FUNCTION）→ STEP2（手動リフレッシュ）→ STEP3（件数確認）の順で1ファイルを Run
    - STEP3 で `mv_snapshot_count` が `videos_table_count` に追いついていれば復旧

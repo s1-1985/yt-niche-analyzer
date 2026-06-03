@@ -133,7 +133,16 @@ def main():
     cleanup_old_snapshots(sb)
 
     # 8. マテリアライズドビュー更新（クエリ高速化）
-    refresh_materialized_views(sb)
+    failed_refreshes = refresh_materialized_views(sb)
+    if failed_refreshes:
+        critical = [g for g in failed_refreshes if "Group1" in g]
+        if critical:
+            logger.error(
+                f"Critical MV refresh failed: {critical}. "
+                "Dashboard data will be stale until pg_cron refreshes at 14:00 UTC."
+            )
+            sys.exit(1)
+        logger.warning(f"Non-critical MV refresh failed (pg_cron will handle): {failed_refreshes}")
 
     logger.info(
         f"Collection complete. "
