@@ -98,8 +98,14 @@ pg_cron（DB内部）が無料枠での正解。
 
 **安定化ロードマップ（着手順）**：
 - A. ✅ `cleanup_old_snapshots` はDBに**実在確認済み**（2026-06-03）→ 削除処理は生きている。
-     ただしプロジェクトは約1ヶ月で365日保持の削除はまだ未発動＝容量は~2027-05まで増加後プラトー。
-     **要確認: Supabase DashboardでDB現容量（無料500MB枠への余裕）**。
+- 🔴🔴 **【緊急】DB容量が無料枠超過（2026-06-03 確認）**: `pg_database_size` = **605MB > 500MB上限**。
+     - **主因はMV**（再生成可能なキャッシュ）: mv_video_tags 160MB / mv_video_ranking 64MB /
+       mv_video_topics 43MB … 上位だけで350MB超。本物のデータ(videos96+snapshots48+44+channels33≒220MB)は軽い。
+     - ※mv_outlier_channels(12MB) は doctor の22MVリストに無い＝MVがさらに存在(drift)。
+     - **将来の別問題**: video/channel_snapshots は今92MBだが365日保持で1年後~600MBまで増える→保持短縮(90日)が必要。
+     - **対策順**: (1)全MVサイズ一覧で不要MV特定→削除 (2)14:00 UTCの非CONCURRENT全更新でbloat回収し再計測
+       (3)snapshot保持365→90日 (4)なお超過ならPro/範囲縮小。MVは消しても実データ無傷。
+     - 教訓: 「無料×全部MVで爆速×データ増加」の三立は構造的に困難。容量は継続監視必須。
 - Tier1（静かな障害をなくす）:
      ③ ✅ **doctor適用済み・初回オールグリーン**（2026-06-03 02:09）`sql/migrate_health_check.sql`
         cronジョブID2で毎日14:30 UTC点検。初回 ok=true / issues={} /
