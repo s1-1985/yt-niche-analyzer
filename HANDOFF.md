@@ -44,8 +44,18 @@
 - `collector/requirements.txt` — `libsql-client>=0.3.0` 追加
 - **PR #63 マージ済み**: `libsql://` → `https://` URL 変換バグ修正 + `_batch()`/`_run()` での Statement ラッピング修正
   （この修正がないと Turso Migration ワークフローが WSS 400 エラーで失敗する）
-- **PR #64 マージ済み**: `PRAGMA foreign_keys = OFF` を sync.py と turso_client.py に追加
-  （channels.topic_ids に topics テーブル外の YouTube ID が含まれるため FK 制約違反が発生していた）
+- **PR #64 マージ済み（→ #65 で置き換え）**: `PRAGMA foreign_keys = OFF` 方式は不採用に
+- **PR #65 マージ済み（2026-06-12・徹底監査の結果）**: **FK 制約を全廃する根本修正**
+  - PRAGMA は接続単位の設定で、ステートレスな HTTP API ではリクエストごとに別接続に
+    当たりうるため信頼できない（#64 の方式が不十分だった理由）
+  - 【致命的潜在バグ発見】FK 有効時の `INSERT OR REPLACE` は親行 DELETE→CASCADE で
+    子行全消し。日次 dual-write のたびにチャンネルの全動画が消える構造だった
+  - schema.sql から REFERENCES/CASCADE 削除。sync.py は DROP→再作成（旧 FK 付き
+    テーブルは CREATE IF NOT EXISTS では直らないため）
+  - ORDER BY 付きページネーション・BATCH 500・進捗ログ・移行後の件数検証 verify() 追加
+  - workflow timeout 120分・依存ピン止め
+  - **ローカル SQLite (file:) で12項目の E2E テスト全パス**（孤立 topic_id 挿入＝3回目の
+    失敗ケースそのもの、FK ON でのチャンネル再 upsert で動画が残ること等を実証）
 
 ### Phase 2（次：フロントエンドの Turso クエリ移行）
 - フロントエンドの RPC 呼び出しを Supabase から Turso HTTP API 直クエリに切り替え
@@ -348,14 +358,15 @@ groups = [
 
 ### 🚀 Turso 移行 Phase 2（最優先）
 
-**⚠️ 事前確認: PR #63 マージ済み（2026-06-03）= 接続バグ修正済み**
+**⚠️ 事前確認: PR #63 / #65 マージ済み（2026-06-12）= 接続バグ・FK 問題とも根本修正済み**
 
 **1. `Turso Migration (one-time)` GitHub Actions ワークフローを手動実行する**
 - GitHub → Actions → "Turso Migration (one-time)" → "Run workflow" ボタン
-- 完了ログ「=== Migration complete ===」が出れば OK
-- 所要時間目安: 15〜30分
-- 再実行は安全（INSERT OR REPLACE / INSERT OR IGNORE）
-- 成功すれば Turso に 140k+ 動画・46k+ チャンネルがコピーされる
+- ⚠️ 08:00 UTC（17:00 JST）の日次 collect と同時実行しない（DROP と dual-write が衝突するため）
+- 完了ログ「=== Migration complete ===」の直前に **Turso 側の全テーブル件数**が出る
+  （videos ~140k / video_tags ~850k 規模なら成功）
+- 所要時間目安: 30〜45分（timeout は 120分に拡大済み）
+- 再実行は安全（毎回 DROP→全量再投入）
 
 **2. フロントエンドの Turso 接続設定**
 - `@libsql/client` npm パッケージを追加
