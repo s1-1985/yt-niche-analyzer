@@ -29,16 +29,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 PAGE = 1000   # Supabase ページサイズ
-BATCH = 200   # Turso 1リクエストの SQL 文数
+BATCH = 500   # Turso 1リクエストの SQL 文数
+
+# DROP 順（子→親の順。FK は無いが念のため依存の逆順）
+ALL_TABLES = [
+    "collection_log",
+    "video_snapshots", "channel_snapshots",
+    "video_tags", "video_topics", "channel_topics",
+    "videos", "channels", "topics",
+]
 
 
 # ── helpers ──────────────────────────────────────────────────
 
-def _paginate(sb, table: str, select: str = "*", extra=None):
-    """Supabase テーブルをページ単位で全行読む（ジェネレータ）。"""
+def _paginate(sb, table: str, select: str = "*", order=("id",), extra=None):
+    """Supabase テーブルをページ単位で全行読む（ジェネレータ）。
+
+    ORDER BY を必ず付ける: 順序なし OFFSET ページングは Postgres では
+    行の取りこぼし・重複が起きうる。
+    """
     offset = 0
     while True:
-        q = sb.table(table).select(select).range(offset, offset + PAGE - 1)
+        q = sb.table(table).select(select)
+        for col in order:
+            q = q.order(col)
+        q = q.range(offset, offset + PAGE - 1)
         if extra:
             q = extra(q)
         rows = q.execute().data
@@ -51,26 +66,35 @@ def _paginate(sb, table: str, select: str = "*", extra=None):
         offset += PAGE
 
 
-def _run(client, stmts: list) -> None:
+def _run(client, stmts: list, label: str = "") -> None:
     import libsql_client  # type: ignore
-    for i in range(0, len(stmts), BATCH):
+    total = len(stmts)
+    for i in range(0, total, BATCH):
         chunk = [
             libsql_client.Statement(s[0], s[1]) if isinstance(s, tuple) else s
             for s in stmts[i : i + BATCH]
         ]
         client.batch(chunk)
+        done = min(i + BATCH, total)
+        # 大きいテーブル（タグ85万件等）で沈黙しないよう 5万件ごとに進捗を出す
+        if done % 50_000 < BATCH or done == total:
+            logger.info(f"  {label or 'stmts'}: pushed {done}/{total}")
 
 
 # ── schema ────────────────────────────────────────────────────
 
 def apply_schema(client) -> None:
+    # 旧テーブルは FK 制約付きで作成済みの可能性がある。SQLite は FK を後から
+    # 外せず CREATE TABLE IF NOT EXISTS も既存を置き換えないため、必ず DROP する。
+    # （データは直後に Supabase から全量再投入されるので安全）
+    for t in ALL_TABLES:
+        client.execute(f"DROP TABLE IF EXISTS {t}")
+    logger.info("Old tables dropped.")
+
     schema = (Path(__file__).parent / "schema.sql").read_text()
     stmts = [s.strip() for s in schema.split(";") if s.strip()]
     for stmt in stmts:
-        try:
-            client.execute(stmt)
-        except Exception as e:
-            logger.warning(f"schema stmt skipped ({e}): {stmt[:60]}")
+        client.execute(stmt)
     logger.info("Schema applied.")
 
 
@@ -86,7 +110,7 @@ def sync_topics(sb, client) -> None:
             [row["id"], row["name"], row.get("name_ja"),
              row.get("category"), row.get("parent_id")],
         ))
-    _run(client, stmts)
+    _run(client, stmts, "topics")
     logger.info(f"topics: {len(stmts)} rows synced.")
 
 
@@ -107,8 +131,8 @@ def sync_channels(sb, client) -> None:
                 [row["id"], tid],
             ))
 
-    _run(client, ch_stmts)
-    _run(client, ct_stmts)
+    _run(client, ch_stmts, "channels")
+    _run(client, ct_stmts, "channel_topics")
     logger.info(f"channels: {len(ch_stmts)} rows, channel_topics: {len(ct_stmts)} rows synced.")
 
 
@@ -143,11 +167,11 @@ def sync_videos(sb, client) -> None:
                 [row["id"], tag],
             ))
 
-    _run(client, v_stmts)
+    _run(client, v_stmts, "videos")
     logger.info(f"videos: {len(v_stmts)} rows synced.")
-    _run(client, vt_stmts)
+    _run(client, vt_stmts, "video_topics")
     logger.info(f"video_topics: {len(vt_stmts)} rows synced.")
-    _run(client, vtag_stmts)
+    _run(client, vtag_stmts, "video_tags")
     logger.info(f"video_tags: {len(vtag_stmts)} rows synced.")
 
 
@@ -159,7 +183,8 @@ def sync_video_snapshots(sb, client, days: int = 90) -> None:
     def _filter(q):
         return q.gte("snapshot_date", cutoff)
 
-    for row in _paginate(sb, "video_snapshots", extra=_filter):
+    for row in _paginate(sb, "video_snapshots",
+                         order=("video_id", "snapshot_date"), extra=_filter):
         stmts.append((
             "INSERT OR REPLACE INTO video_snapshots"
             " (video_id, snapshot_date, view_count, like_count, comment_count)"
@@ -167,7 +192,7 @@ def sync_video_snapshots(sb, client, days: int = 90) -> None:
             [row["video_id"], row["snapshot_date"],
              row.get("view_count"), row.get("like_count"), row.get("comment_count")],
         ))
-    _run(client, stmts)
+    _run(client, stmts, "video_snapshots")
     logger.info(f"video_snapshots: {len(stmts)} rows synced.")
 
 
@@ -179,7 +204,8 @@ def sync_channel_snapshots(sb, client, days: int = 90) -> None:
     def _filter(q):
         return q.gte("snapshot_date", cutoff)
 
-    for row in _paginate(sb, "channel_snapshots", extra=_filter):
+    for row in _paginate(sb, "channel_snapshots",
+                         order=("channel_id", "snapshot_date"), extra=_filter):
         stmts.append((
             "INSERT OR REPLACE INTO channel_snapshots"
             " (channel_id, snapshot_date, subscriber_count, view_count, video_count)"
@@ -187,8 +213,20 @@ def sync_channel_snapshots(sb, client, days: int = 90) -> None:
             [row["channel_id"], row["snapshot_date"],
              row.get("subscriber_count"), row.get("view_count"), row.get("video_count")],
         ))
-    _run(client, stmts)
+    _run(client, stmts, "channel_snapshots")
     logger.info(f"channel_snapshots: {len(stmts)} rows synced.")
+
+
+# ── verify ────────────────────────────────────────────────────
+
+def verify(client) -> None:
+    """移行結果の件数を Turso 側で実測してログに残す。"""
+    logger.info("--- Turso row counts ---")
+    for t in ["topics", "channels", "channel_topics",
+              "videos", "video_topics", "video_tags",
+              "video_snapshots", "channel_snapshots"]:
+        rs = client.execute(f"SELECT COUNT(*) FROM {t}")
+        logger.info(f"  {t}: {rs.rows[0][0]} rows")
 
 
 # ── main ──────────────────────────────────────────────────────
@@ -217,12 +255,12 @@ def main() -> None:
     try:
         logger.info("=== Turso migration start ===")
         apply_schema(tc)
-        tc.execute("PRAGMA foreign_keys = OFF")
         sync_topics(sb, tc)
         sync_channels(sb, tc)
         sync_videos(sb, tc)
         sync_video_snapshots(sb, tc)
         sync_channel_snapshots(sb, tc)
+        verify(tc)
         logger.info("=== Migration complete ===")
     finally:
         tc.close()
