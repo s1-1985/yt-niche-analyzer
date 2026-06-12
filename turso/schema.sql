@@ -5,6 +5,14 @@
 --   PostgreSQL の配列型 (topic_ids[], tags[]) を junction テーブルに正規化。
 --   マテリアライズドビュー 22個は全廃。集計はその場計算（SQLite ならタイムアウトなし）。
 --   スナップショット保持: 90日（Supabase の 365日から短縮）。
+--
+-- ⚠️ FK 制約は意図的に張らない:
+--   1. topic_ids には topics テーブル（キュレーション62件）外の ID が混入する
+--   2. Turso は FK を強制し、FK 有効時の INSERT OR REPLACE は親行の
+--      DELETE→CASCADE で子行（動画・スナップショット）を全消しする
+--   3. PRAGMA foreign_keys は接続単位の設定で、ステートレスな HTTP API では
+--      リクエストごとに別接続に当たるため信頼できない
+--   孤立行は JOIN で自然に除外される（Supabase と同じ挙動）。
 -- ============================================================
 
 -- トピック（ジャンル）マスタ
@@ -13,7 +21,7 @@ CREATE TABLE IF NOT EXISTS topics (
   name      TEXT NOT NULL,
   name_ja   TEXT,
   category  TEXT,
-  parent_id TEXT REFERENCES topics(id)
+  parent_id TEXT
 );
 
 -- チャンネルマスタ
@@ -26,15 +34,15 @@ CREATE TABLE IF NOT EXISTS channels (
 
 -- チャンネル×トピック（channels.topic_ids[] を正規化）
 CREATE TABLE IF NOT EXISTS channel_topics (
-  channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-  topic_id   TEXT NOT NULL REFERENCES topics(id)   ON DELETE CASCADE,
+  channel_id TEXT NOT NULL,
+  topic_id   TEXT NOT NULL,
   PRIMARY KEY (channel_id, topic_id)
 );
 
 -- 動画マスタ
 CREATE TABLE IF NOT EXISTS videos (
   id               TEXT PRIMARY KEY,
-  channel_id       TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  channel_id       TEXT NOT NULL,
   title            TEXT,
   published_at     TEXT,  -- ISO8601
   duration_seconds INTEGER,
@@ -46,21 +54,21 @@ CREATE TABLE IF NOT EXISTS videos (
 
 -- 動画×トピック（videos.topic_ids[] を正規化）
 CREATE TABLE IF NOT EXISTS video_topics (
-  video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-  topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+  video_id TEXT NOT NULL,
+  topic_id TEXT NOT NULL,
   PRIMARY KEY (video_id, topic_id)
 );
 
 -- 動画タグ（videos.tags[] を正規化）
 CREATE TABLE IF NOT EXISTS video_tags (
-  video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  video_id TEXT NOT NULL,
   tag      TEXT NOT NULL,
   PRIMARY KEY (video_id, tag)
 );
 
 -- 動画スナップショット（日次指標。90日保持）
 CREATE TABLE IF NOT EXISTS video_snapshots (
-  video_id      TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  video_id      TEXT NOT NULL,
   snapshot_date TEXT NOT NULL,  -- YYYY-MM-DD
   view_count    INTEGER,
   like_count    INTEGER,
@@ -70,7 +78,7 @@ CREATE TABLE IF NOT EXISTS video_snapshots (
 
 -- チャンネルスナップショット（日次指標。90日保持）
 CREATE TABLE IF NOT EXISTS channel_snapshots (
-  channel_id       TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  channel_id       TEXT NOT NULL,
   snapshot_date    TEXT NOT NULL,  -- YYYY-MM-DD
   subscriber_count INTEGER,
   view_count       INTEGER,

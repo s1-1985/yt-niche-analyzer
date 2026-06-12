@@ -6,7 +6,7 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 60   # データ量次第で15〜30分。余裕を持って60分
+    timeout-minutes: 120   # 実測見積もり30〜45分（タグ85万件含む）。余裕を持って120分
 
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +17,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install supabase libsql-client
+        run: pip install "supabase>=2.0.0,<3.0.0" "libsql-client>=0.3.0,<0.4.0"
 
       - name: Run migration
         env:

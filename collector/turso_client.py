@@ -13,14 +13,15 @@ _BATCH_SIZE = 200  # 1 回の HTTP リクエストに含める SQL 文数
 
 
 def init_turso_client(url: str, auth_token: str):
-    """Turso (LibSQL) 同期クライアントを初期化する。"""
+    """Turso (LibSQL) 同期クライアントを初期化する。
+
+    スキーマは FK 制約なし（turso/schema.sql 参照）。PRAGMA foreign_keys は
+    接続単位の設定でステートレスな HTTP API では信頼できないため使わない。
+    """
     import libsql_client  # type: ignore
     # libsql:// は WebSocket(WSS)を使い 400 になるため https:// に変換して HTTP API を使う
     http_url = url.replace("libsql://", "https://")
-    client = libsql_client.create_client_sync(url=http_url, auth_token=auth_token)
-    # topic_ids にキュレーション済み topics テーブル外の ID が含まれるため FK チェックを無効化
-    client.execute("PRAGMA foreign_keys = OFF")
-    return client
+    return libsql_client.create_client_sync(url=http_url, auth_token=auth_token)
 
 
 def _batch(client, stmts: list) -> None:
